@@ -1,0 +1,38 @@
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# User data & sensitive files (never commit API keys or private speech history)
+.env
+config.json
+history.json
+
+# Downloaded model weights (downloaded on demand, >1.5 GB)
+models/
+*.onnx
+*.bin
+
+# IDE & agent scratch dirs
+.claude/
+.idea/
+.vscode/
+docs/
+
+# Build & distribution
+build/
+dist/
+*.spec
+*.egg-info/
+
+# Logs
+*.log
+logs/
