@@ -5,9 +5,7 @@ from asr import nemotron_asr, qwen_asr
 
 ENGINE_ORDER = ["whisper", "qwen3", "nemotron"]
 
-# Pros/cons text is grounded in this project's own benchmarking (see the
-# comments in qwen_asr.py / nemotron_asr.py for the numbers this summarizes),
-# not marketing copy -- keep it factual when editing.
+# ASR engine definitions and metadata.
 ENGINES = {
     "whisper": {
         "label": "Whisper",

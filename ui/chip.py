@@ -30,11 +30,7 @@ def _tinted(l: float, c: float, h_deg: float, alpha255: int) -> QColor:
     return color
 
 
-# Every state paints the same quiet glass pill; only "pasted" (the one green the chip
-# ever shows) and "failed" tint the fill/stroke -- lifted directly from the design
-# mockup's literal oklch()/rgba() values via this project's own oklch_to_hex, since the
-# chip has a fixed dark-glass look of its own regardless of the app's light/dark theme
-# (not driven by ui/theme.py's DARK/LIGHT tokens).
+# State styling and tint colors for the status chip.
 _TINT_DEFAULT = QColor(75, 78, 95, 175)  # rgba(75,78,95,.686)
 _STROKE_DEFAULT = QColor(255, 255, 255, 160)  # rgba(255,255,255,.63)
 _TINT_PASTED = _tinted(0.46, 0.075, 155, 184)  # oklch(0.46 0.075 155 / 0.72)
@@ -289,9 +285,7 @@ class ChipWindow(QWidget):
             paint_glyph(painter, rect)
 
     def _paint_idle(self, painter: QPainter, rect):
-        """A 3x3 dot breathing via opacity only, on a slow ~4.5s cycle -- reads
-        as "alive" without drawing attention. Matches the mockup's `chipbreath`
-        keyframe exactly (opacity .55<->1, no size change)."""
+        """Draws a subtle pulsing dot for idle state."""
         cx, cy = rect.width() / 2, rect.height() / 2
         pulse = self._oscillate(4500)  # 0..1
         r = 1.5
@@ -353,10 +347,7 @@ class ChipWindow(QWidget):
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
 
-        # Linear 0.85s/rotation, matching the mockup's `spin` keyframe (rotate
-        # 0->360, "to" only -- no easing). Qt angles are in 1/16th of a degree,
-        # measured counterclockwise from 3 o'clock; a 270-degree sweep with a
-        # 90-degree gap reads as a classic rotating loading spinner.
+        # Rotating arc spinner for transcription state.
         t = (self._elapsed_ms() % 850) / 850
         start_angle = t * 360
         span_angle = 270
@@ -383,10 +374,7 @@ class ChipWindow(QWidget):
         return cached
 
     def _paint_sweep(self, painter: QPainter, rect):
-        """A soft highlight band, a third of the pill wide, crossing fully off
-        one edge and onto the other over 1.5s ease-in-out -- matches the
-        mockup's `sweep` keyframe (translateX -110% -> 210% of the band's own
-        width) and distinguishes cleanup from plain transcription."""
+        """Draws a soft highlight sweep across the pill during cleanup."""
         band_w = rect.width() * 0.34
         eased = self._ease_in_out(1500)  # 0..1, single pass then snaps back
         x = -1.10 * band_w + eased * (3.20 * band_w)
@@ -443,9 +431,7 @@ class ChipWindow(QWidget):
         painter.drawEllipse(QRectF(cx - dot_d / 2, top + bar_h + gap, dot_d, dot_d))
 
     def _paint_pulsing_dots(self, painter: QPainter, rect, *, count, dot_d, gap, left_x, period_ms, stagger, offset):
-        """A left-anchored row of `count` dots, each independently pulsing
-        opacity+scale via the mockup's `dotp` keyframe, staggered by `stagger`
-        seconds per dot starting at `offset` seconds."""
+        """Draws pulsing dots with staggered phases."""
         dot_r = dot_d / 2
         cy = rect.height() / 2
         x = left_x + dot_r

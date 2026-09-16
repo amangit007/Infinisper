@@ -95,9 +95,7 @@ def _parse_rgba(rgba: str) -> QColor:
 
 
 class _BreathingDot(QWidget):
-    """Small pulsing status dot -- same sine-driven technique as ui.chip.ChipWindow's
-    idle animation, just always-on rather than state-gated (the mockup's dot breathes
-    regardless of Ready/Listening/Transcribing too)."""
+    """Status indicator dot with subtle breathing animation."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -105,10 +103,6 @@ class _BreathingDot(QWidget):
         self._color = QColor("#5ec386")
         self._frame = 0
         self._timer = QTimer(self)
-        # 140ms rather than a smoother 70ms -- this repaints forever for as long as the
-        # window is open, and on a frameless WA_TranslucentBackground window every
-        # repaint (even of a 7x7 widget) costs a full-window alpha recomposite on
-        # Windows. Halving the tick rate is a real, cheap win against that baseline tax.
         self._timer.setInterval(140)
         self._timer.timeout.connect(self._tick)
         self._timer.start()

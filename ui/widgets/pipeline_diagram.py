@@ -2,9 +2,7 @@ from PySide6.QtCore import QRectF, QTimer, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
-# Exact coordinates ported from the mockup's SVG (916x212 viewBox, M/H/V/Q path commands
-# map ~1:1 onto QPainterPath moveTo/lineTo/quadTo). Keep these in lockstep with the box
-# rects below -- every edge starts/ends exactly on a box boundary.
+# Diagram dimensions and node bounding boxes.
 _CANVAS_SIZE = (916, 212)
 _MIC_CENTER = (48, 100)
 _MIC_RADIUS = 28
@@ -16,11 +14,6 @@ _FLOW_DASH = [9, 63]
 _STATIC_DASH = [4, 5]
 _SHORT_FLOW_MS_PER_CYCLE = 1900
 _LONG_FLOW_MS_PER_CYCLE = 2800
-# 50ms, not a smoother 30ms -- _flow_phase accumulates in real assumed-elapsed-ms per
-# tick (see _on_tick), so raising this cuts repaint frequency without changing the
-# animation's actual speed. On a frameless WA_TranslucentBackground window every
-# repaint costs a full-window alpha recomposite on Windows, and this diagram is the
-# one widget guaranteed to be animating continuously whenever ASR or multimodal is on.
 _FLOW_TICK_MS = 50
 
 
@@ -56,11 +49,7 @@ def _skip_path() -> QPainterPath:
 
 
 class PipelineDiagram(QWidget):
-    """Live preview of the mic -> ASR -> multimodal -> output routing, ported from the
-    mockup's SVG paths and its renderVals() edge-derivation logic. Updates immediately
-    when a checkbox is toggled on the Dashboard, independent of Save -- this is a
-    preview of what *would* be saved, matching the mockup's own live-preview behavior.
-    """
+    """Visual pipeline diagram showing audio routing through ASR and multimodal processing."""
 
     def __init__(self, parent=None):
         super().__init__(parent)

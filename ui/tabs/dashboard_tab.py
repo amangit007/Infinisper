@@ -39,9 +39,7 @@ def _parse_rgba(rgba: str) -> QColor:
 
 
 class _EngineRow(QWidget):
-    """One clickable, radio-selectable ASR engine row -- the mockup's compact picker,
-    not the old full status/delete card (that detail moves to the Models & providers
-    engine table)."""
+    """Clickable, radio-selectable ASR engine selection row."""
 
     def __init__(self, engine_id: str, meta: dict, parent=None):
         super().__init__(parent)

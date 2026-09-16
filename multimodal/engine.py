@@ -31,24 +31,13 @@ logging.getLogger("LiteLLM").setLevel(logging.ERROR)
 
 TIMEOUT_SECONDS = 60  # default; the app's Multimodal correction card lets the user override this
 
-# litellm's `timeout=` kwarg is not reliably honored for every provider path --
-# observed failures against the Gemini/AI-Studio path report "Connection timed
-# out after None seconds", meaning the configured timeout never reached the
-# actual HTTP client. A hard deadline here is enforced independently, from
-# outside litellm, for every provider, so a stuck network call can never block
-# the hotkey/dictation loop past this.
+# Thread pool executor to enforce request timeouts across providers.
 _executor = ThreadPoolExecutor(max_workers=2)
 
 MIN_LENGTH_RATIO = 0.4
 MAX_LENGTH_RATIO = 2.5
 
-# Stage-3 interim: until the Providers/Models UI (a later stage) exists,
-# multimodal correction still only ever resolves to a Gemini key from .env,
-# exactly like before this refactor -- app.py checks has_gemini_env_key() and
-# passes GEMINI_ENV_MODEL + get_gemini_env_key() into the functions below,
-# which otherwise no longer know anything about "Gemini" specifically. Once the
-# Models tab lands, active-model resolution reads config.json + credentials.py
-# instead, and this becomes just the migration fallback for an existing key.
+# Default model fallback.
 GEMINI_ENV_MODEL = "gemini/gemini-3.5-flash-lite"
 
 

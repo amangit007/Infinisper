@@ -1,9 +1,4 @@
-"""describe_error turns litellm's raw exceptions into one sentence a person can read.
-
-The fixtures below mirror real exceptions captured from the Gemini API. litellm's own
-str(exc) for the quota case is ~2,000 characters of nested JSON behind a doubled
-"litellm.RateLimitError:" prefix -- which is what the Add-model dialog used to show.
-"""
+"""Tests for multimodal error message formatting."""
 
 import json
 from concurrent.futures import TimeoutError as FutureTimeoutError

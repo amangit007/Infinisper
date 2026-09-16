@@ -45,18 +45,7 @@ def _layer(body: str, color: str) -> QSvgRenderer:
 
 
 class AnimatedMark(QWidget):
-    """The mark's own anatomy as the loading animation, per Infinisper Brand.html:
-    "the three waves leave the bubble in sequence while the clipboard draws
-    itself -- instead of adding a foreign spinner." The clipboard fades in once
-    at startup ("draws itself"), the bubble breathes continuously, and the three
-    waves pop in and hold on a staggered loop.
-
-    Opacity-only, not the CSS original's opacity+scale -- QSvgRenderer draws
-    crisply at any opacity, but an accurate scaled+faded layer stack needs a
-    fresh offscreen buffer per layer per frame. Opacity alone still reads as a
-    clean reveal at this size, for an animation that only needs to run for the
-    few seconds of real app boot.
-    """
+    """Animated brand mark loading indicator."""
 
     def __init__(self, color: str, size: int = _MARK_SIZE, parent=None):
         super().__init__(parent)
@@ -117,16 +106,7 @@ class AnimatedMark(QWidget):
 
 
 class SplashScreen(QWidget):
-    """Cold-start splash, shown while the speech model loads, the microphone
-    opens, and the hotkey registers. Per Infinisper Brand.html's handoff notes:
-    frameless, centered on the active screen, closes the instant the main
-    window is ready.
-
-    Progress reflects the app's *real* boot steps via set_step() -- not a
-    fixed-duration fake animation. This project already has a rule against
-    that (ui/chip.py's mic meter is driven by real audio levels, not a canned
-    loop); the same discipline applies to a progress bar.
-    """
+    """Cold-start splash shown while initializing models and audio capture."""
 
     def __init__(self, parent=None):
         super().__init__(parent)

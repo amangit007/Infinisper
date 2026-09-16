@@ -7,11 +7,7 @@ _LABELS_BY_ID = dict(CURATED_PROVIDERS)
 
 
 class ProviderCard(QWidget):
-    """One row in the Providers list card on Models & providers. Matches the
-    design mockup: name + a masked-key/URL detail line, an "Edit" pill on the
-    right -- deletion lives inside the edit dialog rather than as a second
-    button on the row, per the mockup.
-    """
+    """Row widget representing a configured multimodal provider."""
 
     edit_requested = Signal(str)  # provider id
 

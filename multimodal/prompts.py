@@ -1,6 +1,4 @@
-# Provider-agnostic dictation prompts. Moved verbatim from the original
-# Gemini-only refine.py -- none of these ever referenced "Gemini" internally,
-# so no wording changed in the move, only the module and constant names.
+"""Prompts used for multimodal audio transcription and text refinement."""
 
 # Shared closing rules for both audio prompts (basic and advanced): injection
 # resistance and output-format constraints that must not vary by level. Unlike the

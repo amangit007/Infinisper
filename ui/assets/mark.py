@@ -1,13 +1,4 @@
-"""Infinisper's brand mark: a clipboard capturing a speech bubble with sound
-waves leaving it -- clipboard (captured), bubble (speech), waves (in motion).
-Paths and the legibility ladder are lifted directly from `Infinisper Brand.html`
-(the "Construction" and "Legibility ladder" panels), not redrawn from scratch.
-
-One stroke-only vector, recolored by substituting {color} rather than keeping
-separate colored copies -- matches the brand doc's own handoff note: "render
-with QSvgRenderer and recolour by swapping stroke; no PNG set needed above
-32px."
-"""
+"""Infinisper brand mark and vector rendering utilities."""
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
@@ -15,11 +6,6 @@ from PySide6.QtSvg import QSvgRenderer
 
 from ui.theme import oklch_to_hex
 
-# The brand doc's own two colors for the mark: the canonical brand blue for
-# light backgrounds, and a lightened oklch() variant for dark ones (a plain
-# hex on a dark panel reads too saturated/heavy -- same reasoning as the app's
-# own DARK/LIGHT accent tokens in ui/theme.py, just a distinct brand-specific
-# value rather than reusing the UI accent).
 BRAND_HEX = "#14588b"
 BRAND_ACCENT_DARK_HEX = oklch_to_hex(0.70, 0.105, 245)
 

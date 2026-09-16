@@ -373,13 +373,7 @@ class ModelDialog(QDialog):
 
 
 class EnginesSubTab(QWidget):
-    """The Speech recognition section: one card containing the Model / Size /
-    Languages / Status table for Whisper, Qwen3-ASR and Nemotron, matching
-    the design mockup's single combined Status column (not a separate
-    Actions column). Owns none of the actual download/load/switch logic
-    (that stays in app.py, same as before) -- this just renders current
-    state and forwards user intent via signals.
-    """
+    """Sub-tab for viewing and managing on-device speech recognition engines."""
 
     activate_requested = Signal(str)  # engine_id
     delete_requested = Signal(str)  # engine_id
@@ -506,11 +500,7 @@ class EnginesSubTab(QWidget):
 
 
 class ProvidersSubTab(QWidget):
-    """The Multimodal section's Providers card, matching the mockup: a
-    card header with an inline '+ Add provider' pill, a flat list of
-    provider rows (Edit only -- delete lives inside the edit dialog), and a
-    footer note.
-    """
+    """Card widget for managing multimodal provider configurations."""
 
     def __init__(self, models_tab: "ModelsTab", parent=None):
         super().__init__(parent)
@@ -608,12 +598,7 @@ class ProvidersSubTab(QWidget):
 
 
 class ModelsSubTab(QWidget):
-    """The Multimodal section's Models card, matching the mockup: a card
-    header with an inline '+ Add model' pill, a flat list of model rows
-    (audio/text tag + Activate/Active pill, plus small rename/delete
-    glyphs the mockup doesn't have a slot for but this app still needs),
-    and a footer note.
-    """
+    """Card widget for managing multimodal models."""
 
     def __init__(self, models_tab: "ModelsTab", parent=None):
         super().__init__(parent)
@@ -724,14 +709,7 @@ class ModelsSubTab(QWidget):
 
 
 class ModelsTab(QWidget):
-    """Models & providers: one scrollable page with two numbered sections --
-    Speech recognition (1) and Multimodal (2) -- matching the design
-    mockup, which has no tab widget at all here. Owns all reading/writing
-    of config.json's multimodal_providers/multimodal_models/
-    active_multimodal_model_id -- every operation re-reads the file fresh
-    immediately before writing, so it never races with the Dashboard tab's
-    own independent, less frequent writes to active_multimodal_model_id.
-    """
+    """Models & providers tab for configuring speech recognition engines and multimodal models."""
 
     changed = Signal()  # providers/models/active-model changed -- app.py refreshes its runtime cache
     activate_engine_requested = Signal(str)  # engine_id

@@ -1,11 +1,4 @@
-﻿"""Covers how the Add-model dialog decides whether a model accepts audio.
-
-The bug these exist for: completion_kwargs sets num_retries=0, which is correct for
-the dictation path but was also being inherited by the capability probe. One transient
-503 from a busy provider -- reproduced live against gemini/gemini-3.8-flash, which
-answered 200 then 503 moments later -- permanently recorded supports_audio=False into
-config.json, and nothing ever revisited it.
-"""
+"""Tests for multimodal model audio capability detection."""
 
 import litellm
 import pytest
@@ -132,9 +125,7 @@ def test_a_failing_text_call_still_blocks_the_save(monkeypatch):
 
 
 def test_the_text_call_is_retried_too(monkeypatch):
-    """Observed live: gemini/gemini-3.8-flash 503'd on the text call as well, which
-    blocked saving the model outright with an error implying the model or key was
-    wrong."""
+    """Verify text completion calls are retried on transient errors."""
     monkeypatch.setattr(
         litellm, "completion", fake_completion_sequence(service_unavailable(), None, None)
     )

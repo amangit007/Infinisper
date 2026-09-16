@@ -3,11 +3,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 
 class ModelCard(QWidget):
-    """One row in the Models list card on Models & providers. Matches the
-    design mockup: name + provider/model-id detail line, an audio/text-only
-    tag, and an Activate/Active pill -- plus small ghost-glyph rename/delete
-    buttons the mockup doesn't show a slot for but this app still needs.
-    """
+    """Row widget representing a configured multimodal model."""
 
     rename_requested = Signal(str)  # model id
     delete_requested = Signal(str)  # model id

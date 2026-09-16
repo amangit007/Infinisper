@@ -9,7 +9,7 @@ _KNOB = _HEIGHT - _PADDING * 2
 
 
 class ToggleSwitch(QWidget):
-    """Pill-shaped on/off switch matching the mockup's track+knob control."""
+    """Pill-shaped on/off toggle switch control."""
 
     toggled = Signal(bool)
 

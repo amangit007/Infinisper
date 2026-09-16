@@ -1,10 +1,4 @@
-"""Color tokens and QSS assembly for the Infinisper UI.
-
-The design mockup (Claude Design, `Infinisper.dc.html`) defines its palette as CSS custom
-properties using `oklch()`, which Qt Style Sheets cannot parse. `oklch_to_hex` reproduces the
-standard OKLCh -> linear-sRGB -> sRGB conversion (Bjorn Ottosson's published OKLab matrices) so
-every token below is the same color the mockup renders, just pre-resolved to hex/rgba.
-"""
+"""Color tokens and QSS assembly for the Infinisper UI."""
 
 import math
 
@@ -51,8 +45,7 @@ def _linear_to_srgb(v: float) -> float:
     return min(1.0, max(0.0, v))
 
 
-# Danger (delete / close) accents -- used identically in both themes in the mockup, always
-# passed as a literal oklch() rather than a themed custom property.
+# Alert / danger colors
 DANGER = oklch_to_hex(0.6, 0.17, 25)
 DANGER_TEXT = oklch_to_hex(0.7, 0.17, 25)
 DANGER_STRONG = oklch_to_hex(0.55, 0.19, 25)

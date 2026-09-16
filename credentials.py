@@ -1,12 +1,7 @@
 import keyring
 import keyring.errors
 
-# Every multimodal provider's API key is stored under this one keyring service
-# name, keyed by the provider's id (e.g. "gemini", "openai"). On Windows this
-# lands in Credential Manager -- never in config.json, never logged. The app
-# reads it straight back to show in the Providers tab's plaintext field; that's
-# a deliberate product choice (keys are visible inside the app, nowhere else),
-# not an oversight.
+# Provider API keys are stored securely in Windows Credential Manager.
 _SERVICE_NAME = "infinisper"
 _LEGACY_SERVICE_NAME = "freewisperr"
 

@@ -5,7 +5,7 @@ from ui.assets.mark import mark_pixmap
 
 _HEIGHT = 38
 _BUTTON_SIZE = (34, 24)
-_MARK_SIZE = 16  # matches Infinisper Brand.html's own "in place" titlebar mockup
+_MARK_SIZE = 16
 
 
 class _MarkGlyph(QLabel):
@@ -18,12 +18,7 @@ class _MarkGlyph(QLabel):
 
 
 class TitleBar(QWidget):
-    """Frameless-window titlebar: drag-to-move, minimize/maximize/close.
-
-    Windows' UIPI/focus rules don't come into play here -- unlike the chip (invariant 1),
-    this window is a normal activatable app window, so startSystemMove() is safe to use
-    directly instead of the ctypes fallbacks the chip needs.
-    """
+    """Frameless window titlebar supporting drag-to-move and window controls."""
 
     close_requested = Signal()
 

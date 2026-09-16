@@ -12,16 +12,9 @@ DEFAULT_CONFIG = {
     "multimodal_level": "basic",  # "basic" | "advanced"
     "multimodal_timeout_seconds": 60,
     "fallback_to_whisper": True,
-    # Only takes effect when use_multimodal is on -- local ASR engines have no
-    # way to rewrite script, only the multimodal cleanup/transcribe prompt does.
     "force_english_transliteration": False,
     "dictation_language": "en",  # "en", "auto", "hi", "es", "fr", "de", "ja", "zh"
-    # Names, acronyms and jargon a general model mishears. Boosted in Whisper's
-    # decoder and named to the multimodal model in its prompt; Qwen3 and Nemotron
-    # cannot be biased through their current sherpa-onnx exports.
     "custom_words": [],
-    # Non-secret metadata only -- the actual API key for each provider lives in
-    # credentials.py (keyring / Windows Credential Manager), never here.
     "multimodal_providers": [],  # [{"id", "base_url"}]
     "multimodal_models": [],  # [{"id", "provider_id", "model", "display_name",
     #                             "supports_audio", "last_tested", "test_passed"}]

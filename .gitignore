@@ -25,7 +25,12 @@ models/
 .claude/
 .idea/
 .vscode/
+.agents/
 docs/
+*.html
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 
 # Build & distribution
 build/

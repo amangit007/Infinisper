@@ -8,13 +8,7 @@ REPO_ID = "csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2
 MODEL_DIR = Path(__file__).parent.parent / "models" / "nemotron-3.5-asr"
 REQUIRED_FILES = ["tokens.txt", "encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx"]
 
-# This export's cache-aware streaming encoder chunks audio in 1120ms windows (see
-# the repo name and its README). The tail of a recording doesn't fill a full
-# chunk, and without enough trailing silence to complete one, the last word(s)
-# come back truncated (observed on a real clip: "...fifty pieces of co" with
-# under a second of padding). Padded slightly above the model's own chunk size
-# rather than sherpa-onnx's generic 0.66s example padding, which predates this
-# specific chunk-size export and isn't guaranteed sufficient for it.
+# Trailing silence padding to ensure the final chunk is fully decoded.
 TAIL_PADDING_SECONDS = 1.2
 
 

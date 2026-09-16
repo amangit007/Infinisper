@@ -37,10 +37,7 @@ MIN_HOLD_SECONDS = 0.15
 # Rough empirical cutoff between "silence/room noise" and actual speech at 16 kHz float32.
 SILENCE_RMS_THRESHOLD = 0.005
 
-# The chip's own auto-revert timer (see ui/chip.py) brings pasted/nospeech/failed back
-# to idle on its own -- this just maps a pipeline outcome to the state that best shows
-# it, per the design mockup's chip states. "idle" is the fallback for outcomes that
-# don't correspond to a distinct chip state.
+# Map pipeline outcomes to overlay chip states.
 _CHIP_STATE_FOR_OUTCOME = {
     "error": "failed",
     "skipped_silence": "nospeech",
@@ -969,10 +966,7 @@ def main():
     tray.open_window_requested.connect(main_window.show_dashboard)
     single_instance.show_requested.connect(main_window.show_dashboard)
 
-    # Cold-start splash (Infinisper Brand.html, "Loader A") covers the real boot
-    # work below -- speech model load, mic open, extra-engine load -- so the wait
-    # reads as visible progress instead of a blank or frozen main window. Closes
-    # the instant the main window is ready, per the brand doc's own handoff note.
+    # Splash screen displayed during application startup.
     splash = SplashScreen()
     splash.show()
     app.processEvents()

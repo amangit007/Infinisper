@@ -130,20 +130,7 @@ def _test_text_call(model: str, api_key: str | None, base_url: str | None) -> tu
 
 
 def _test_audio_call(model: str, api_key: str | None, base_url: str | None) -> tuple[str, str]:
-    """Probes whether `model` accepts an audio message, returning one of the AUDIO_*
-    statuses and a detail string.
-
-    A short near-silent clip is enough -- this only needs to confirm the API accepts
-    audio content and responds without erroring. A correctly-working model can
-    legitimately return empty text for quiet audio (see engine.py's own
-    blank-text-part design), so success means the call went through, not that it
-    produced non-empty text.
-
-    Retried on transient failures. Observed live against gemini/gemini-3.8-flash:
-    the identical call returned 200 on one attempt and a 503 "experiencing high
-    demand" moments later, which the old single-shot probe recorded as
-    supports_audio=False permanently.
-    """
+    """Probe whether the model supports audio inputs."""
     audio = np.zeros(16000, dtype=np.float32)  # 1s of silence at 16kHz
     audio_b64 = audio_to_wav_base64(audio, 16000)
     status, detail = _probe(

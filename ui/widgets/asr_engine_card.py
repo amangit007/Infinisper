@@ -7,17 +7,7 @@ MODEL_SIZES = ["tiny", "base", "small", "medium"]
 
 
 class EngineTableRow(QWidget):
-    """One row of the ASR engine table on Models & providers: Model / Size /
-    Languages / Status, matching the design mockup's single combined Status
-    column (a status pill plus whatever action buttons apply, right-aligned)
-    rather than a separate Actions column.
-
-    Built fresh on every refresh() call by the owning sub-tab rather than
-    mutated in place -- this project's own dashboard work this session hit
-    real, repeated cases where updating an existing widget's stylesheet or
-    text at runtime did not reliably repaint; a freshly constructed widget
-    always paints correctly, so that's the pattern here too.
-    """
+    """Row widget representing an ASR engine entry in the engines table."""
 
     activate_requested = Signal(str)  # engine_id
     delete_requested = Signal(str)  # engine_id

@@ -4,10 +4,6 @@ from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 from ui.assets.mark import mark_icon
 from ui.theme import DARK
 
-# Near-white, not the accent blue -- per Infinisper Brand.html's own "in place"
-# mockup, which shows the tray-scale mark as a plain light glyph (stroke
-# #e8eaef / DARK["text"]) against the tray's dark surface, the same way most
-# other system tray icons read as monochrome rather than colored at 16px.
 _TRAY_COLOR = DARK["text"]
 
 

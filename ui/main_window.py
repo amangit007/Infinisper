@@ -21,11 +21,7 @@ from ui.tabs.language_tab import LanguageTab
 from ui.tabs.models_tab import ModelsTab
 from ui.theme import THEMES, build_stylesheet
 
-# The mockup's own canvas is a fixed 1320x864 rect -- used as the app's *default* size,
-# not a hard limit; the window resizes and maximizes like a normal app (see
-# _ResizableContainer below). The margin around the content is also where the drop
-# shadow gets room to render without being clipped by the window bounds -- it collapses
-# to 0 while maximized, same as a real window losing its shadow when snapped/maximized.
+# Default window dimensions and shadow margins.
 _CONTENT_SIZE = (1320, 864)
 _SHADOW_MARGIN = 24
 _MIN_SIZE = (760, 560)
@@ -273,10 +269,7 @@ class MainWindow(QMainWindow):
         self._apply_theme()
 
     def _set_default_geometry(self):
-        # Default to the mockup's own content size, but never larger than the screen's
-        # actual usable area (minus the taskbar) -- a fixed 1368x912 window was clipping
-        # off the bottom of smaller/scaled displays. Centered rather than left at
-        # whatever position the platform picks by default.
+        # Center window within available screen geometry.
         screen = QApplication.primaryScreen().availableGeometry()
         default_w = min(_CONTENT_SIZE[0] + _SHADOW_MARGIN * 2, screen.width() - 80)
         default_h = min(_CONTENT_SIZE[1] + _SHADOW_MARGIN * 2, screen.height() - 80)

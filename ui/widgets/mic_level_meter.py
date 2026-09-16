@@ -6,17 +6,11 @@ from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QWidget
 
 _BAR_COUNT = 14
-_REST_HEIGHT_FRACTION = 0.18  # matches the mockup's scaleY(.18) idle floor
+_REST_HEIGHT_FRACTION = 0.18
 
 
 class MicLevelMeter(QWidget):
-    """Real mic-level bars for the sidebar.
-
-    Unlike the mockup (a CSS keyframe loop that "breathes" whether or not anyone is
-    talking), this only ever reflects real audio: `audio.capture` only calls
-    `update_audio_level` while actively recording, so the bars sit at a flat rest
-    floor the rest of the time instead of faking activity.
-    """
+    """Audio level visualizer displaying dynamic microphone activity bars."""
 
     _level_changed = Signal(float)
 
