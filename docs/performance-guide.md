@@ -9,10 +9,10 @@ Practical advice for getting maximum speed and accuracy out of Infinisper on you
 | Your Goal | Speech Engine | AI Cleanup | Notes |
 |---|---|---|---|
 | **Fastest start, lowest memory** | Whisper (CPU) | Off | Works offline right after install; minimal RAM footprint. |
-| **Everyday dictation (Recommended)** | Nemotron 3.5 (CPU) | Ollama (local, e.g. Qwen 0.5B–1.5B) | 100% local and private. ~0.5s response time. |
-| **Long-form prose & bulleted lists** | Nemotron 3.5 (CPU) | Ollama (local, Gemma 4B) or Cloud (free tier) | Maximum formatting precision. |
-| **Multilingual (FR, DE, ZH, JA)** | Qwen3-ASR (CPU) | Optional | Highest transcription fidelity for European & Asian languages. |
-| **Hindi & Hinglish** | Nemotron 3.5 (CPU) | Optional (Ollama or Cloud) | Best-in-class accuracy for spoken Hindi. |
+| **Everyday fast dictation (Recommended)** | Nemotron 3.5 (CPU) | Ollama (local, e.g. Qwen 0.5B–1.5B) | 100% local and private. ~0.5s response time. Real-time streaming for English & Hindi. |
+| **Highest multilingual accuracy** | Qwen3-ASR (CPU) | Optional | Top accuracy across European, East Asian, and complex or code-mixed Hindi speech. |
+| **Long-form prose & bulleted lists** | Nemotron or Qwen3 (CPU) | Ollama (local, Gemma 4B) or Cloud | Maximum formatting and structuring precision. |
+| **Zero local model RAM (ultra-low-spec PCs)** | None (Bypassed) | Audio-capable Cloud AI (e.g. Gemini) | Audio goes directly to an audio-supported model; zero local speech models held in RAM. |
 
 ---
 
@@ -20,17 +20,18 @@ Practical advice for getting maximum speed and accuracy out of Infinisper on you
 
 All three engines run **100% locally on your CPU**. No discrete GPU or CUDA installation is required.
 
-### 1. Nemotron 3.5 ASR (Best for Everyday English & Hindi)
+### 1. Nemotron 3.5 ASR (Streaming Speed Champion)
 - **Streaming by default:** Transcribes 50 ms audio slices while you are speaking. When you release the hotkey, only the final frame remains to decode.
 - **Sub-200ms latency:** Typically finishes in ~130–170 ms on an ordinary laptop CPU.
-- **Hindi accuracy:** Scored an impressive 1.9% Character Error Rate (CER) on real read speech, significantly outperforming Whisper Base.
+- **English & Hindi:** Strong, near-instant transcription for English and everyday Hindi.
 
-### 2. Qwen3-ASR (Best for Non-English European & East Asian Languages)
-- **High precision:** Tested as the top local engine for French, German, Chinese, and Japanese.
-- **Batch processing:** Transcribes after key release. For best speed, speak in natural chunks (1–2 sentences at a time) rather than continuous multi-minute monologues.
+### 2. Qwen3-ASR (Multilingual Accuracy Champion)
+- **Top multilingual fidelity:** The most capable engine for French, German, Chinese, Japanese, and conversational or code-mixed Hindi.
+- **Practical accuracy:** While Nemotron measures slightly ahead on strictly read, scripted sample clips, Qwen3's larger acoustic modeling excels in everyday dictation on natural phrasing, accents, and multilingual mixing.
+- **Streaming with Dynamic Catch-Up Batching:** Speech segments are dispatched to background decoding at natural breath pauses while you speak. If backlog accumulates, waiting chunks are decoded together via native ONNX batching. Post-speech wait time drops to **~0.6–1.4 s** (down from ~3–8 s).
 
 ### 3. Whisper (Quick Start)
-- Bundled default that downloads a small model (~140 MB) on first launch. Low memory, reliable for basic dictation. Most daily users will prefer upgrading to Nemotron via **Models & providers**.
+- Bundled default that downloads a small model (~140 MB) on first launch. Low memory, reliable for basic dictation. Most daily users will prefer upgrading to Nemotron (for speed) or Qwen3 (for multilingual accuracy) via **Models & providers**.
 
 ### Real-world latency on CPU
 
@@ -38,10 +39,11 @@ Medians over real dictation on an AMD Ryzen 7 laptop (no GPU used for speech rec
 
 | Setup | Speech Engine (CPU) | Total (Key Release → Pasted Text) |
 |---|---|---|
-| **Nemotron (Streaming)** | **131 ms** | **169 ms** |
+| **Nemotron (Streaming)** | **102–131 ms** | **169 ms** |
 | **Nemotron + Local Ollama Cleanup** | 131 ms | **~0.56 s** |
 | **Nemotron + Cloud Cleanup** | 127 ms | **1.06 s** |
-| **Qwen3-ASR (Batch)** | 1.74 s | 3.35 s |
+| **Qwen3-ASR (Streaming with Catch-Up Batching)** | **0.64 s – 1.40 s** | **~0.70 s – 1.46 s** |
+| **Qwen3-ASR (Pure Batch)** | 1.27 s – 4.31 s | 1.33 s – 4.37 s |
 
 ---
 

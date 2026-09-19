@@ -19,7 +19,7 @@
   <img src="assets/demo.gif" width="860" alt="Holding Ctrl+Win and speaking a sentence: the floating pill shows the mic level, then the cleaned-up text appears in Notepad">
 </p>
 
-Wispr Flow made hold-to-talk voice dictation feel effortless, but a recurring $12–$15/month subscription and streaming your live microphone audio to third-party cloud servers isn't for everyone.
+Wispr Flow made hold-to-talk voice dictation feel effortless, but a paid monthly subscription and streaming your live microphone audio to third-party cloud servers isn't for everyone.
 
 **Infinisper gives you that same seamless dictation experience on Windows — completely free, open source, and running on your own PC.**
 
@@ -31,16 +31,15 @@ Wispr Flow made hold-to-talk voice dictation feel effortless, but a recurring $1
 
 ## How it compares
 
-| Feature | Infinisper | Wispr Flow | Typical Whisper Wrappers |
+| Feature | Infinisper | Cloud Dictation (e.g. Wispr Flow) | Typical Whisper Wrappers |
 |---|---|---|---|
-| **Pricing** | **Free & Open Source (MIT)** | $12–$15 / month | Free / Open Source |
+| **Pricing** | **Free & Open Source (MIT)** | Paid subscription (~$5+/month) | Free / Open Source |
 | **Speech Recognition** | **100% Local (Runs on CPU)** | Cloud servers | Local or Cloud |
 | **Latency** | **~0.24s (Streaming ASR)** | ~1.0s | 2–8s (Batch waits for take to finish) |
 | **Hardware Needed** | **Standard Intel / AMD CPU** | Any (Cloud-based) | Often needs high-end NVIDIA GPU |
 | **AI Formatting & Cleanup** | **Local via Ollama** (or Cloud) | Cloud AI | None (raw transcription only) |
-| **Audio Privacy** | **Zero audio leaves PC** | Sent to remote servers | Audio stays local |
+| **Audio Privacy** | **100% Local (RAM only)** | Sent to remote servers | 100% Local |
 | **Clipboard Safety** | **Preserves & restores previous clipboard** | Direct hook / paste | Often overwrites clipboard |
-| **Custom Jargon & Vocabulary** | **Built-in dictionary tuning** | Cloud profile | Rare |
 
 ---
 
@@ -75,12 +74,13 @@ Measured on a standard laptop CPU (Ryzen 7, 8 cores). The speech engine runs **p
 - **Pre-roll ring buffer:** Constantly keeps a rolling half-second audio buffer in memory, so you can speak the exact millisecond you press the hotkey without your first word getting cut off.
 - **Studio-grade audio pipeline:** Automatically removes DC offset, applies a 23×-vectorized 80 Hz rumble filter, notches out mechanical key clicks, and trims silence with Silero VAD before decoding.
 - **Three local speech engines to choose from:**
-  - **Nemotron 3.5 ASR**: Ultra-fast streaming, near-instant latency, and top accuracy on English and Hindi.
-  - **Qwen3-ASR**: Unmatched accuracy on German, French, Chinese, and Japanese.
+  - **Nemotron 3.5 ASR**: Ultra-fast real-time streaming, near-instant latency (~0.2s), and solid accuracy for English and fast Hindi dictation.
+  - **Qwen3-ASR**: Overall accuracy champion across multilingual dictation (French, German, Chinese, Japanese, and complex/code-mixed Hindi).
   - **Whisper (base / small)**: Lightweight starter engine that works immediately with minimal memory.
 - **Accuracy regulation in the Language tab:**
   - Set your dictation language explicitly for instant model guidance.
   - Add names, project acronyms, and technical jargon to the built-in dictionary so they are never misheard.
+- **Flexible processing modes:** Speech-only (pure local speed), Speech + Cleanup (local ASR + Ollama/cloud polish), or Direct Audio-to-AI (routes audio straight to multimodal models like Gemini for **zero local model RAM usage** on low-spec PCs).
 - **Lightweight floating pill:** Clean minimalist overlay showing live mic levels and dictation status that never steals window focus. Supports light and dark mode.
 
 ---
