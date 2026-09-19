@@ -183,9 +183,7 @@ Local models through Ollama needed some fixes of their own:
 - **Thinking is switched off.** Reasoning models will spend tens of seconds deliberating
   over a tidy-up job. The request tells Ollama not to think, and temperature is fixed at 0
   so the same sentence always comes back the same way.
-- **`localhost` is rewritten to `127.0.0.1`.** On Windows, `localhost` resolves to IPv6
-  first; Ollama listens on IPv4, so every request waited about two seconds for the IPv6
-  attempt to time out before falling back.
+- **IPv4 fast connection (`127.0.0.1`).** Local endpoints automatically normalize to IPv4 (`127.0.0.1`) to eliminate Windows IPv6 resolution delays.
 - **The model is kept loaded.** Ollama unloads an idle model after five minutes, and loading
   one again takes 1.5 s for a 0.5B model and about 10 s for a 4B one. At startup Infinisper
   sends an empty request that loads the active model without generating anything, and every

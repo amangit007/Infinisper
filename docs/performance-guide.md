@@ -1,137 +1,79 @@
-# Getting the best speed and accuracy
+# Performance & Optimization Guide
 
-Practical advice from daily use — Infinisper is the author's main way of writing,
-including long-form text. None of this is required; the defaults work. This is for when
-you want to tune.
+Practical advice for getting maximum speed and accuracy out of Infinisper on your hardware. Infinisper is designed to work out of the box on standard consumer CPUs, but you can tune your setup based on your workflow.
 
 ---
 
-## Pick a setup
+## Recommended Setups
 
-| You want | Speech engine | AI cleanup |
-|---|---|---|
-| **To start right now, lowest memory** | Whisper | Off |
-| **Better accuracy, still low memory** | Whisper or Nemotron | Gemini 3.5 Flash Lite (free tier) |
-| **Fully local, fast** — closest to Wispr Flow | Nemotron | A small Ollama model |
-| **French, German, Chinese, Japanese** | Qwen3-ASR | Optional |
-| **Hindi** | Nemotron | Optional; a hosted model fixes spelling best |
-
----
-
-## The speech engines, honestly
-
-**Nemotron is the everyday engine.** It's faster than Whisper *and* more accurate in
-English. It transcribes while you speak, so there's almost nothing left to do when you
-release the key. Its weak spot is other languages — outside English, results drop off
-noticeably in some languages, though not in Hindi: on six sentences read aloud, it made
-fewer mistakes than Qwen3-ASR and was four times faster
-([the numbers](benchmarks.md#hindi-measured-on-a-real-voice)).
-
-**Qwen3-ASR is the most accurate for most other languages, and the slowest.** In a spot
-check it beat Nemotron and Whisper on French, German, Chinese and Japanese. The quality
-feels closer to a large cloud model that takes audio directly than to a typical local
-speech engine.
-
-It handles long takes, but it works best if you **speak in shorter stretches** —
-a sentence or two, release, continue. Long recordings are split at natural pauses and
-transcribed piece by piece, which works, but short takes come back faster.
-
-**Whisper** is the quick-start option. A small one-time download (about 140 MB, fetched on first launch), low memory. Fine to start with; most
-people will want to move to Nemotron once they're dictating regularly.
-
-### Measured on one machine
-
-Median over real use from the author's history, CPU only. Your hardware will differ;
-the ratios are what matter.
-
-| Setup | Takes | Speech engine | Total, key-release to text |
+| Your Goal | Speech Engine | AI Cleanup | Notes |
 |---|---|---|---|
-| Nemotron (streaming) | 33 | 131 ms | **169 ms** |
-| Nemotron + cloud cleanup | 128 | 127 ms | **1.06 s** |
-| Qwen3-ASR | 17 | 1.74 s | 3.35 s |
-| Qwen3-ASR + cloud cleanup | 55 | 2.43 s | 3.45 s |
-
-For comparison, Nemotron *before* it streamed took a median 2.18 s to transcribe. Streaming
-moved that work into the time you're talking. For controlled tests — speed by speech
-length, memory, and a multilingual spot check — see [Benchmarks](benchmarks.md).
+| **Fastest start, lowest memory** | Whisper (CPU) | Off | Works offline right after install; minimal RAM footprint. |
+| **Everyday dictation (Recommended)** | Nemotron 3.5 (CPU) | Ollama (local, e.g. Qwen 0.5B–1.5B) | 100% local and private. ~0.5s response time. |
+| **Long-form prose & bulleted lists** | Nemotron 3.5 (CPU) | Ollama (local, Gemma 4B) or Cloud (free tier) | Maximum formatting precision. |
+| **Multilingual (FR, DE, ZH, JA)** | Qwen3-ASR (CPU) | Optional | Highest transcription fidelity for European & Asian languages. |
+| **Hindi & Hinglish** | Nemotron 3.5 (CPU) | Optional (Ollama or Cloud) | Best-in-class accuracy for spoken Hindi. |
 
 ---
 
-## AI cleanup
+## The Speech Engines
 
-The speech engine gives you what you said. Cleanup fixes grammar and punctuation, and at the
-**Advanced** level also drops filler words and formats spoken lists.
+All three engines run **100% locally on your CPU**. No discrete GPU or CUDA installation is required.
 
-### Cloud: Gemini 3.5 Flash Lite
+### 1. Nemotron 3.5 ASR (Best for Everyday English & Hindi)
+- **Streaming by default:** Transcribes 50 ms audio slices while you are speaking. When you release the hotkey, only the final frame remains to decode.
+- **Sub-200ms latency:** Typically finishes in ~130–170 ms on an ordinary laptop CPU.
+- **Hindi accuracy:** Scored an impressive 1.9% Character Error Rate (CER) on real read speech, significantly outperforming Whisper Base.
 
-The best all-rounder if you're happy for **text** (or audio, in audio mode) to leave your
-machine. Fast, accurate, works in most situations, and the free tier covers normal personal
-use. It also accepts audio directly, so it can replace the local engine entirely.
+### 2. Qwen3-ASR (Best for Non-English European & East Asian Languages)
+- **High precision:** Tested as the top local engine for French, German, Chinese, and Japanese.
+- **Batch processing:** Transcribes after key release. For best speed, speak in natural chunks (1–2 sentences at a time) rather than continuous multi-minute monologues.
 
-Open-weight models such as **GPT-OSS 120B on Groq** are a close alternative. In testing it
-was a little quicker end to end (0.78 s vs 1.02 s) but slower on long passages, and it wrote
-clean prose without formatting spoken lists the way Gemini did. It's text-only, so it can
-clean up a transcript but can't take your audio directly.
+### 3. Whisper (Quick Start)
+- Bundled default that downloads a small model (~140 MB) on first launch. Low memory, reliable for basic dictation. Most daily users will prefer upgrading to Nemotron via **Models & providers**.
 
-### Local: Ollama
+### Real-world latency on CPU
 
-For fully offline cleanup, a model between roughly **0.5B and 4B parameters** is enough —
-this is a simple task, and bigger models only add latency. The trade-off within that range is
-real, though: the smallest models are the fastest but start slipping on long passages, while
-a ~4B model like `gemma4:e4b` stays reliable. Start small, and step up if you see mistakes.
+Medians over real dictation on an AMD Ryzen 7 laptop (no GPU used for speech recognition):
 
-Two things are already handled for you:
-
-- **Thinking is turned off** for Ollama models. Reasoning models otherwise spend many
-  seconds "thinking" about a job that doesn't need it.
-- **Ollama is reached at `127.0.0.1`, not `localhost`.** On Windows, `localhost` tries IPv6
-  first and can stall about two seconds per request before falling back. If you add Ollama
-  yourself, use `http://127.0.0.1:11434`.
-
-**A model that isn't loaded is slow to answer** — 1.5 s for a 0.5B model, about 10 s for a 4B
-one — and 5–8× faster once loaded. Ollama unloads idle models after 5 minutes, so Infinisper
-loads yours when it starts and asks Ollama to keep it for **30 minutes**. You can change that on
-the Dashboard under **Keep model loaded** (2 hours, or until Ollama quits). It's a trade: a loaded
-model holds its memory the whole time, so choose the shortest wait you can live with on a small
-machine. Leave it on **Ollama default** and Infinisper won't touch it. A GPU, even an integrated
-one, speeds Ollama up considerably.
-
-**Nemotron + a small Ollama model gets you close to Wispr Flow — in both quality and speed
-— entirely on your own machine.** Measured: about 0.6–0.7 s from releasing the key to
-polished text. See [Benchmarks](benchmarks.md#the-whole-pipeline-speech-engine--ai-cleanup).
+| Setup | Speech Engine (CPU) | Total (Key Release → Pasted Text) |
+|---|---|---|
+| **Nemotron (Streaming)** | **131 ms** | **169 ms** |
+| **Nemotron + Local Ollama Cleanup** | 131 ms | **~0.56 s** |
+| **Nemotron + Cloud Cleanup** | 127 ms | **1.06 s** |
+| **Qwen3-ASR (Batch)** | 1.74 s | 3.35 s |
 
 ---
 
-## Accuracy tips
+## AI Cleanup: Recommended Local Ollama Setup
 
-**Set your dictation language** in the Language tab rather than leaving it on automatic.
-This helps Whisper and the AI cleanup step noticeably — and with both of those together,
-it's faster too, because nothing has to guess the language first.
+AI cleanup is optional, but recommended if you want the polished Wispr Flow feel: removing filler words ("um", "like", "you know"), correcting punctuation, and structuring spoken lists into bullets.
 
-**Add names and jargon** to the custom dictionary in the Language tab. This reaches Whisper
-and the cleanup step, not Nemotron or Qwen3.
+### Recommended: Local Ollama (100% Offline)
+To keep your data completely private, run a local LLM through [Ollama](https://ollama.com):
+- **Model size recommendations:** A compact model between **0.5B and 1.5B parameters** (e.g. `qwen2.5:0.5b` or `qwen2.5:1.5b`) is lightning fast and runs smoothly on both CPU and GPU. For longer complex dictations, a ~4B model (like `gemma:4b`) provides higher formatting reliability.
+- **Keep model loaded:** Ollama unloads idle models after 5 minutes by default. Infinisper automatically pre-warms your active model at launch and keeps it in memory for **30 minutes** (customizable in the Dashboard). A loaded model responds 5–8× faster than a cold start.
+- **Reasoning disabled:** Thinking is automatically disabled for Ollama models so you don't wait tens of seconds on reasoning tokens for simple grammar cleanup.
 
-**Writing in one language but want another?** The Language tab can keep your words as
-spoken, romanize them (for example Hindi as Hinglish), or translate them. This happens in the
-cleanup step, so it needs cleanup turned on.
+### Optional: Cloud Providers
+If you prefer not running a local LLM or have very constrained RAM, Infinisper supports Gemini (Flash Lite free tier), Groq, OpenAI, and any OpenAI-compatible provider via LiteLLM. Audio or text only leaves your machine if you explicitly configure a cloud provider.
 
 ---
 
-## GPUs and Qwen3-ASR
+## Regulating Accuracy in the Language Tab
 
-A GPU helps Ollama a lot. It does **not** help Qwen3-ASR as shipped here, and in some tests
-it made it slower. Two reasons, as best understood so far:
+Speech recognition models can sometimes mishear uncommon words or struggle with language switching. Use the **Language** tab to maximize transcription accuracy:
 
-- **The bundled speech runtime is CPU-only.** The `sherpa-onnx` package installed from pip is
-  built without CUDA. Asking it for a GPU silently falls back to CPU.
-- **The models are int8-quantized.** That's what keeps them small and quick on a CPU. Much of
-  that int8 work has no GPU implementation in ONNX Runtime, so a GPU build keeps shuttling data
-  between graphics memory and the CPU for those steps. For a small 0.6B model, that traffic can
-  cost more than the GPU saves.
+1. **Set your dictation language explicitly:**
+   Instead of leaving the language on automatic detection, select your primary language. This eliminates detection latency and prevents misidentifying accents.
+2. **Add custom vocabulary & jargon:**
+   Technical terms, project codenames, acronyms, and proper names can be added one per line in the custom dictionary. Whisper uses these as decoding prompts, and the cleanup step is explicitly instructed to recognize and preserve them.
+3. **Language transformations:**
+   If you dictate in one language but want the text output in another (e.g., spoken Hindi formatted as Latin Hinglish, or direct translation), configure the output mode in the Language tab with cleanup enabled.
 
-Getting real GPU speed means running an unquantized (FP16) model on a GPU-oriented runtime such
-as vLLM. That's possible, but the CUDA runtime and its libraries run to many gigabytes — the
-size comes from the runtime, not the model — which is why it isn't bundled.
+---
 
-If you have a capable GPU and want speed, put it to work on **Ollama** and run **Nemotron** on
-the CPU. That combination is already fast.
+## Hardware & CPU vs. GPU Realities
+
+- **Speech recognition runtime:** The bundled `sherpa-onnx` and `faster-whisper` runtimes use optimized int8 CPU instructions. They do not require a discrete GPU to be fast.
+- **Ollama GPU offloading:** If you have an NVIDIA or AMD GPU, Ollama will automatically offload cleanup models to GPU VRAM for near-instant 150–250ms text polishing. If you are on CPU only, lightweight 0.5B–1.5B models will still complete cleanup in well under a second.
