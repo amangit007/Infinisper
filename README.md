@@ -7,8 +7,8 @@
 <p align="center"><em>Hold a key, speak naturally, release — clean, AI-polished text lands at your cursor in a fraction of a second. 100% offline & private.</em></p>
 
 <p align="center">
-  <a href="https://github.com/amangit007/infinisper/releases/latest"><img src="https://img.shields.io/github/v/release/amangit007/infinisper?color=0078d4&label=release" alt="latest release"></a>
-  <a href="https://github.com/amangit007/infinisper/actions/workflows/tests.yml"><img src="https://github.com/amangit007/infinisper/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="https://github.com/amangit007/Infinisper/releases/tag/v1.0.0"><img src="https://img.shields.io/github/v/release/amangit007/Infinisper?color=0078d4&label=release" alt="latest release"></a>
+  <a href="https://github.com/amangit007/Infinisper/actions/workflows/tests.yml"><img src="https://github.com/amangit007/Infinisper/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
   <img src="https://img.shields.io/badge/privacy-100%25%20local-success" alt="100% Local">
@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/amangit007/infinisper/releases/latest">
+  <a href="https://github.com/amangit007/Infinisper/releases/download/v1.0.0/Infinisper-v1.0.0-Setup.exe">
     <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.0_Setup.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
   </a>
   &nbsp;
-  <a href="https://github.com/amangit007/infinisper/releases/latest">
+  <a href="https://github.com/amangit007/Infinisper/releases/download/v1.0.0/Infinisper-v1.0.0-Portable.zip">
     <img src="https://img.shields.io/badge/Download_Portable-v1.0.0_Zip-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Download Portable">
   </a>
 </p>
@@ -90,7 +90,7 @@ Measured on a standard laptop CPU (Ryzen 7, 8 cores). The speech engine runs **p
 
 ### Option A: Single-Click Windows Installer (Recommended)
 
-1. Download **[`Infinisper-v1.0.0-Setup.exe`](https://github.com/amangit007/infinisper/releases/latest)** from the releases page.
+1. Download **[`Infinisper-v1.0.0-Setup.exe`](https://github.com/amangit007/Infinisper/releases/download/v1.0.0/Infinisper-v1.0.0-Setup.exe)** from the [Releases page](https://github.com/amangit007/Infinisper/releases/tag/v1.0.0).
 2. Run the installer and launch Infinisper.
 3. Put your cursor in any application, hold **`Ctrl + Win`**, speak, and release.
 
@@ -102,7 +102,7 @@ Measured on a standard laptop CPU (Ryzen 7, 8 cores). The speech engine runs **p
 - Standard multi-core CPU (no GPU required)
 
 ```cmd
-git clone https://github.com/amangit007/infinisper.git
+git clone https://github.com/amangit007/Infinisper.git
 cd infinisper
 install.bat
 run.bat
