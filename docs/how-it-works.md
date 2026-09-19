@@ -37,7 +37,14 @@ The modules mirror that:
 | `cleanup/` | optional AI cleanup, routed through LiteLLM |
 | `ui/` | window, tray, floating pill, splash |
 | `history/` | what you dictated, and how long each step took |
-| `app.py` | wires it together and runs the dictation pipeline |
+| `dictation/` | the pipeline (hotkey, record, transcribe, clean up, paste), the live settings, and the handlers that change them |
+| `app.py` | builds the window, tray and pipeline, and connects them |
+
+Inside `dictation/`, state is split by who changes it, not kept in globals. `Settings` is the
+running copy of `config.json`, so a take never reads the disk. `Runtime` is what's loaded right
+now: which engines, which microphone. It can differ from the settings while a model downloads.
+`Pipeline` owns the per-take state, such as whether a take is in flight. `SettingsController`
+handles the window's buttons: it saves to `config.json`, then updates the other two.
 
 ---
 
@@ -251,9 +258,6 @@ dependency here has to permit commercial use.
 
 Worth knowing if you're reading the code:
 
-- **`app.py` keeps its state in module-level globals** — configuration, loaded engines, and
-  pipeline state, with one lock. It works for a single-process desktop app, but it's the
-  part most in need of a refactor into a proper session object.
 - **The Nemotron streaming path runs a stateful high-pass filter (>80 Hz)** in its worker
   thread to eliminate desk rumble and DC drift. Batch engines additionally get whole-take
   VAD silence trimming and RMS normalisation; the streaming session is decoded in real time

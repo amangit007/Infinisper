@@ -11,6 +11,10 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
 </p>
 
+<p align="center">
+  <img src="assets/demo.gif" width="860" alt="Holding Ctrl+Win and speaking a sentence: the floating pill shows the mic level, then the cleaned-up text appears in Notepad">
+</p>
+
 **Hold a key, speak, release — the text lands wherever your cursor is.**
 
 Speech recognition runs on your PC. An optional AI step tidies the text — removes "um" and "uh",
@@ -37,7 +41,7 @@ take. Every number comes from a script in [`benchmarks/`](benchmarks) you can ru
 ## What you get
 
 - **Works in any app.** A global hotkey (`Ctrl+Win` by default, configurable) pastes into Notepad, Chrome, Slack, VS Code — and puts your clipboard back afterwards.
-- **Three speech engines.** Whisper for a quick start, Nemotron for fast everyday English, Qwen3-ASR for accuracy and other languages. Switch any time.
+- **Three speech engines.** Whisper for a quick start, Nemotron for fast everyday dictation (it also scored best on Hindi), Qwen3-ASR for accuracy in French, German, Chinese and Japanese. Switch any time.
 - **Optional AI cleanup**, your choice of where it runs: local (Ollama), or a hosted model (Gemini, Groq, OpenAI, and others through LiteLLM). It can also translate or write Hindi in Latin script.
 - **Private by default.** Your voice never leaves the machine unless *you* send audio to a cloud model. API keys live in Windows Credential Manager, not in a file.
 - **A small floating indicator** that shows your mic level without taking focus, and a light and dark theme.

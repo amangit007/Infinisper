@@ -16,11 +16,12 @@ All three run locally. Your audio never leaves your computer.
 | | Download | Good for |
 |---|---|---|
 | **Whisper** (base / small) | Already there | Getting started with the least memory. No download step. |
-| **Nemotron 3.5 ASR** | ~650 MB | Everyday English dictation. Fastest, and more accurate than Whisper. Transcribes while you talk. |
-| **Qwen3-ASR** | ~980 MB | Highest accuracy, and the best choice for other languages. Slowest of the three. |
+| **Nemotron 3.5 ASR** | ~650 MB | Everyday English dictation, and Hindi. Fastest, and more accurate than Whisper. Transcribes while you talk. |
+| **Qwen3-ASR** | ~980 MB | Highest accuracy on the European and East Asian languages tested. Slowest of the three. |
 
 **If you're not sure:** start on Whisper, move to Nemotron once you're dictating daily, and
-switch to Qwen3 when you're speaking something other than English. For measured speeds and
+switch to Qwen3 for French, German, Chinese or Japanese. For Hindi, Nemotron measured better
+than Qwen3, and Whisper's small default model doesn't handle it at all. For measured speeds and
 recommended combinations, see the [performance guide](performance-guide.md).
 
 Downloads happen in **Models & providers**, with a progress bar, and only when you click.

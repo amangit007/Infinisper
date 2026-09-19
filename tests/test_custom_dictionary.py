@@ -1,8 +1,11 @@
 import numpy as np
 import pytest
 
-import app
 from config import DEFAULT_CONFIG
+from dictation import controller as controller_module
+from dictation.controller import SettingsController
+from dictation.pipeline import Pipeline
+from dictation.settings import Runtime, Settings
 from cleanup import engine as cleanup_engine
 from cleanup.prompts import (
     CLEANUP_PROMPT_BASIC,
@@ -50,29 +53,29 @@ def test_custom_words_is_a_real_config_key():
 
 
 def test_saving_from_the_ui_persists_and_takes_effect_immediately(monkeypatch):
-    """The Language tab emits a list; app.py must both write it to config.json and
-    update the live global the next take will read."""
+    """The Language tab emits a list; the controller must both write it to config.json and
+    update the live settings the next take will read."""
     saved = {}
-    monkeypatch.setattr(app, "load_config", lambda: dict(DEFAULT_CONFIG))
-    monkeypatch.setattr(app, "save_config", lambda cfg: saved.update(cfg))
-    monkeypatch.setattr(app, "_custom_words", [])
+    monkeypatch.setattr(controller_module, "load_config", lambda: dict(DEFAULT_CONFIG))
+    monkeypatch.setattr(controller_module, "save_config", lambda cfg: saved.update(cfg))
+    pipeline = Pipeline(Settings(), Runtime())
 
-    app.apply_custom_words(["Kubernetes", "Nemotron"])
+    SettingsController(pipeline, None, None).apply_custom_words(["Kubernetes", "Nemotron"])
 
     assert saved["custom_words"] == ["Kubernetes", "Nemotron"]
-    assert app._custom_words == ["Kubernetes", "Nemotron"]
+    assert pipeline.settings.custom_words == ["Kubernetes", "Nemotron"]
 
 
 def test_saving_an_empty_dictionary_clears_it(monkeypatch):
     saved = {}
-    monkeypatch.setattr(app, "load_config", lambda: dict(DEFAULT_CONFIG, custom_words=["old"]))
-    monkeypatch.setattr(app, "save_config", lambda cfg: saved.update(cfg))
-    monkeypatch.setattr(app, "_custom_words", ["old"])
+    monkeypatch.setattr(controller_module, "load_config", lambda: dict(DEFAULT_CONFIG, custom_words=["old"]))
+    monkeypatch.setattr(controller_module, "save_config", lambda cfg: saved.update(cfg))
+    pipeline = Pipeline(Settings(custom_words=["old"]), Runtime())
 
-    app.apply_custom_words([])
+    SettingsController(pipeline, None, None).apply_custom_words([])
 
     assert saved["custom_words"] == []
-    assert app._custom_words == []
+    assert pipeline.settings.custom_words == []
 
 
 # --- Whisper hotwords ------------------------------------------------------------
@@ -100,39 +103,49 @@ class FakeWhisper:
         return [FakeSegment("transcribed text")], FakeInfo()
 
 
+class WhisperHarness:
+    """A pipeline whose Whisper is the fake, plus a way to run it."""
+
+    def __init__(self):
+        self.model = FakeWhisper()
+        self.settings = Settings(dictation_language="en")
+        self.pipeline = Pipeline(self.settings, Runtime(whisper=self.model))
+
+    @property
+    def kwargs(self):
+        return self.model.kwargs
+
+    def run(self):
+        self.pipeline.run_whisper(np.zeros(16000, dtype=np.float32))
+
+
 @pytest.fixture
-def whisper(monkeypatch):
-    fake = FakeWhisper()
-    monkeypatch.setattr(app, "_model", fake)
-    monkeypatch.setattr(app, "_dictation_language", "en")
-    return fake
+def whisper():
+    return WhisperHarness()
 
 
-def test_custom_words_are_passed_to_whisper_as_hotwords(whisper, monkeypatch):
-    monkeypatch.setattr(app, "_custom_words", WORDS)
-    app._run_whisper(np.zeros(16000, dtype=np.float32))
+def test_custom_words_are_passed_to_whisper_as_hotwords(whisper):
+    whisper.settings.custom_words = WORDS
+    whisper.run()
     assert whisper.kwargs["hotwords"] == "Kubernetes Nemotron Aman OKR"
 
 
-def test_an_empty_dictionary_sends_no_hotwords(whisper, monkeypatch):
+def test_an_empty_dictionary_sends_no_hotwords(whisper):
     """faster-whisper treats an empty string differently from None; it must get None."""
-    monkeypatch.setattr(app, "_custom_words", [])
-    app._run_whisper(np.zeros(16000, dtype=np.float32))
+    whisper.run()
     assert whisper.kwargs["hotwords"] is None
 
 
-def test_whisper_no_longer_runs_its_own_vad(whisper, monkeypatch):
+def test_whisper_no_longer_runs_its_own_vad(whisper):
     """audio.vad already trimmed the take with these exact parameters. Doing it again
     inside faster-whisper would just re-pay the cost."""
-    monkeypatch.setattr(app, "_custom_words", [])
-    app._run_whisper(np.zeros(16000, dtype=np.float32))
+    whisper.run()
     assert whisper.kwargs["vad_filter"] is False
 
 
-def test_auto_language_is_sent_as_none(whisper, monkeypatch):
-    monkeypatch.setattr(app, "_custom_words", [])
-    monkeypatch.setattr(app, "_dictation_language", "auto")
-    app._run_whisper(np.zeros(16000, dtype=np.float32))
+def test_auto_language_is_sent_as_none(whisper):
+    whisper.settings.dictation_language = "auto"
+    whisper.run()
     assert whisper.kwargs["language"] is None
 
 

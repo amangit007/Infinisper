@@ -66,6 +66,11 @@ def audio_model():
     return {"model": chosen["model"], "api_key": get_api_key(provider["id"]), "base_url": provider.get("base_url")}
 
 
+# Pause between hosted-model requests, to stay under free-tier rate limits. It happens
+# after the clip is timed, so it doesn't count toward the seconds reported.
+CLOUD_PAUSE_SECONDS = 4
+
+
 def build_systems(lang: str):
     from faster_whisper import WhisperModel
     from asr.nemotron_asr import NemotronAsrEngine
@@ -92,19 +97,17 @@ def build_systems(lang: str):
         def gemini_audio(a):
             r = cleanup.transcribe_audio_with_model(
                 a, 16000, level="basic", dictation_language=lang, timeout_seconds=60, **gemini)
-            time.sleep(4)
             return r.text if r.used_model else f"[failed: {r.detail}]"
 
         def qwen_then_gemini(a):
             raw = qwen.transcribe(a, 16000)
             r = cleanup.refine_text_with_model(
                 raw, level="basic", dictation_language=lang, timeout_seconds=60, **gemini)
-            time.sleep(4)
             return r.text if r.used_model else raw
 
         systems[f"{name}, audio sent directly"] = gemini_audio
         systems[f"Qwen3-ASR + {name} cleanup"] = qwen_then_gemini
-    return systems
+    return systems, {label for label in systems if "gemini" in label.lower()}
 
 
 def main():
@@ -113,7 +116,7 @@ def main():
     if not (scored_dir / "references.json").exists():
         sys.exit(f"No clips in {scored_dir}. Record some first: python benchmarks/record_clips.py {lang}")
 
-    systems = build_systems(lang.split("-")[0])
+    systems, cloud = build_systems(lang.split("-")[0])
     report = {"language": lang, "systems": {}}
     for label, run in systems.items():
         print(f"-- {label}", flush=True)
@@ -128,6 +131,8 @@ def main():
                 text = run(audio)
                 item = {"clip": name, "reference": reference, "output": text,
                         "seconds": round(time.perf_counter() - t, 2)}
+                if label in cloud:
+                    time.sleep(CLOUD_PAUSE_SECONDS)
                 if key == "clips":
                     item["cer"] = round(cer(reference, text), 4)
                 entry[key].append(item)

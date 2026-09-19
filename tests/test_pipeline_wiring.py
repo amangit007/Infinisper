@@ -9,7 +9,12 @@ after the take is trimmed to speech.
 import numpy as np
 import pytest
 
-import app
+from audio import capture as audio_capture
+from audio import preprocessor as audio_preprocessor
+from audio import vad as audio_vad
+from dictation import paste
+from dictation.pipeline import AsrOutcome, Pipeline
+from dictation.settings import Runtime, Settings
 
 SR = 16000
 
@@ -43,19 +48,19 @@ def pipeline(monkeypatch):
     recording what each stage received."""
     seen = {}
 
-    monkeypatch.setattr(app, "_history_store", None)
-    monkeypatch.setattr(app, "pyperclip", type("P", (), {
+    monkeypatch.setattr(paste, "pyperclip", type("P", (), {
         "paste": staticmethod(lambda: ""),
         "copy": staticmethod(lambda text: None),
     }))
-    monkeypatch.setattr(app, "keyboard", type("K", (), {"send": staticmethod(lambda combo: None)}))
-    monkeypatch.setattr(app, "_restore_clipboard_later", lambda previous, pasted: None)
-    monkeypatch.setattr(app, "_use_asr", True)
-    monkeypatch.setattr(app, "_use_cleanup", False)
+    monkeypatch.setattr(paste, "keyboard", type("K", (), {"send": staticmethod(lambda combo: None)}))
+    monkeypatch.setattr(paste, "restore_clipboard_later", lambda previous, pasted: None)
 
-    real_clean = app.audio_preprocessor.clean_speech_audio
-    real_trim = app.audio_vad.trim_to_speech
-    real_normalize = app.audio_preprocessor.normalize_audio
+    pipeline = Pipeline(Settings(use_asr=True, use_cleanup=False), Runtime())
+    seen["pipeline"] = pipeline
+
+    real_clean = audio_preprocessor.clean_speech_audio
+    real_trim = audio_vad.trim_to_speech
+    real_normalize = audio_preprocessor.normalize_audio
 
     def clean(audio, sample_rate, click_at_seconds=0.5):
         seen["click_at_seconds"] = click_at_seconds
@@ -74,18 +79,18 @@ def pipeline(monkeypatch):
 
     def run_asr(audio, steps=None):
         seen["audio_to_engine"] = audio
-        return app.AsrOutcome("transcribed text", "FakeEngine")
+        return AsrOutcome("transcribed text", "FakeEngine")
 
-    monkeypatch.setattr(app.audio_preprocessor, "clean_speech_audio", clean)
-    monkeypatch.setattr(app.audio_vad, "trim_to_speech", trim)
-    monkeypatch.setattr(app.audio_preprocessor, "normalize_audio", normalize)
-    monkeypatch.setattr(app, "run_asr", run_asr)
+    monkeypatch.setattr(audio_preprocessor, "clean_speech_audio", clean)
+    monkeypatch.setattr(audio_vad, "trim_to_speech", trim)
+    monkeypatch.setattr(audio_preprocessor, "normalize_audio", normalize)
+    monkeypatch.setattr(pipeline, "run_asr", run_asr)
     return seen
 
 
-def run_take(audio, hold=1.0):
+def run_take(seen, audio, hold=1.0):
     chip, tray = FakeChip(), FakeTray()
-    app.transcribe_and_paste(chip, tray, audio, hold)
+    seen["pipeline"].transcribe_and_paste(chip, tray, audio, hold)
     return chip, tray
 
 
@@ -93,22 +98,22 @@ def test_stages_run_in_the_right_order(pipeline):
     """Normalisation must come after trimming, so the level is measured over speech
     rather than over speech plus the silence around it."""
     take = np.concatenate([np.zeros(int(0.5 * SR), dtype=np.float32), speech_like(2.0)])
-    run_take(take)
+    run_take(pipeline, take)
     assert pipeline["order"] == ["clean", "trim", "normalize"]
 
 
 def test_click_suppressor_is_told_the_real_preroll_length(pipeline, monkeypatch):
     """The first take after launch has a partial pre-roll. Passing the nominal 0.5 s
     there would aim the notch at the wrong place -- the original bug."""
-    monkeypatch.setattr(app.audio_capture, "preroll_seconds_used", lambda: 0.15)
-    run_take(np.concatenate([np.zeros(int(0.15 * SR), dtype=np.float32), speech_like(2.0)]))
+    monkeypatch.setattr(audio_capture, "preroll_seconds_used", lambda: 0.15)
+    run_take(pipeline, np.concatenate([np.zeros(int(0.15 * SR), dtype=np.float32), speech_like(2.0)]))
     assert pipeline["click_at_seconds"] == pytest.approx(0.15)
 
 
 def test_trimming_actually_shortens_what_reaches_the_engine(pipeline):
     silence = np.zeros(int(1.5 * SR), dtype=np.float32)
     take = np.concatenate([silence, speech_like(2.0), silence])
-    run_take(take)
+    run_take(pipeline, take)
     assert pipeline["length_into_normalize"] < pipeline["length_into_trim"]
     assert len(pipeline["audio_to_engine"]) < len(take)
 
@@ -116,25 +121,25 @@ def test_trimming_actually_shortens_what_reaches_the_engine(pipeline):
 def test_the_engine_receives_normalised_audio(pipeline):
     """A quiet take must arrive at the engine boosted, not at its original level."""
     quiet = np.concatenate([np.zeros(int(0.5 * SR), dtype=np.float32), speech_like(2.0, amplitude=0.01)])
-    run_take(quiet)
+    run_take(pipeline, quiet)
     delivered = pipeline["audio_to_engine"]
     assert float(np.sqrt(np.mean(delivered.astype(np.float64) ** 2))) > 0.03
 
 
 def test_a_too_short_take_never_reaches_preprocessing(pipeline):
-    chip, _ = run_take(np.zeros(int(0.1 * SR), dtype=np.float32))
+    chip, _ = run_take(pipeline, np.zeros(int(0.1 * SR), dtype=np.float32))
     assert "order" not in pipeline
     assert chip.states == ["nospeech"]
 
 
 def test_a_too_quick_hold_never_reaches_preprocessing(pipeline):
-    chip, _ = run_take(speech_like(2.0), hold=0.05)
+    chip, _ = run_take(pipeline, speech_like(2.0), hold=0.05)
     assert "order" not in pipeline
     assert chip.states == ["nospeech"]
 
 
 def test_a_successful_take_ends_on_the_pasted_state(pipeline):
     take = np.concatenate([np.zeros(int(0.5 * SR), dtype=np.float32), speech_like(2.0)])
-    chip, _ = run_take(take)
+    chip, _ = run_take(pipeline, take)
     assert chip.states[0] == "transcribing"
     assert chip.states[-1] == "pasted"

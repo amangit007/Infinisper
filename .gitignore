@@ -47,3 +47,6 @@ logs/
 
 # Voice recordings made with benchmarks/record_clips.py -- your own voice, kept local by default.
 benchmarks/clips/
+
+# Screen recording the README GIF was made from (28 MB); the GIF in assets/ is what ships
+demo.mp4
