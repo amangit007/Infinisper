@@ -47,13 +47,11 @@ If the speech engine is the slow part, try Nemotron; it transcribes while you ta
 than after you stop. If it's the network, the cleanup step is the cost — turn it off, or run
 it locally through Ollama.
 
-## Local cleanup through Ollama is slow
+## Local cleanup through Ollama is slow or fails
 
-- **The first request after a long break is slow** — Ollama had unloaded the model. On the
-  Dashboard, raise **Keep model loaded** (the default is 30 minutes) so it stays ready.
-- **Check the URL is `http://127.0.0.1:11434`, not `localhost`.** On Windows, `localhost`
-  can add about two seconds to every request.
-- **Use a small model.** 0.5B–4B parameters is plenty for cleanup; larger ones just add wait.
+- **First request after a break is slow:** Ollama unloads idle models after 5 minutes. On the Dashboard, ensure **Keep model loaded** is active (default is 30 minutes) so the model remains warm in memory.
+- **Use a lightweight model:** Compact models between 0.5B and 1.5B parameters (e.g. `qwen2.5:0.5b`) provide fast text cleanup with low resource usage. Larger models (>7B) add noticeable latency without meaningful benefit for simple punctuation and formatting.
+- **Connection check:** Ensure Ollama is running locally. If configuring a custom endpoint, use `http://127.0.0.1:11434`.
 
 ## My old clipboard came back instead of the dictated text
 

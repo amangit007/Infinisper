@@ -10,10 +10,11 @@ python benchmarks/ollama_cold_hot.py   # local models: first request vs. loaded
 python benchmarks/audio_pipeline.py    # audio cleanup chain
 ```
 
-**Test machine:** AMD Ryzen 7 250 (8 cores), 16 GB RAM, Windows 11. The speech engines run
-**on the CPU only**. Ollama 0.33.3 ran its models entirely on the integrated Radeon 780M GPU,
-which is a laptop chip, not a dedicated card. Whisper is the `base` model, and every engine
-runs exactly as the app configures it.
+**Test machine:** AMD Ryzen 7 (8 cores), 16 GB RAM, Windows 11. 
+
+- **Speech Recognition (ASR):** Runs **100% on the CPU only** across all tests (no GPU used).
+- **Optional Local AI Cleanup (Ollama):** Timed with Ollama utilizing an NVIDIA laptop GPU. On CPU-only systems, using a lightweight 0.5B–1.5B model takes ~0.4–0.8s, keeping overall latency well under a second.
+- **Whisper model:** Tested with Whisper `base`. Every engine runs using the application's default settings.
 
 ---
 
@@ -124,32 +125,12 @@ first load after a reboot has to read them from disk, and takes longer still.
 
 ---
 
-## Two settings that matter more than the model
+## Performance defaults that matter
 
-Both are already the default in Infinisper. They're measured here because they're the
-difference between "instant" and "is it broken?".
+These optimizations are enabled by default in Infinisper:
 
-**Thinking disabled.** qwen3.5 0.8B cleaning up the long passage:
-
-| | Median of 3 |
-|---|---|
-| Thinking on | 23.58 s |
-| Thinking off | **0.55 s — 43× faster** |
-
-Reasoning models deliberate at length over a task this simple. Turning thinking off costs
-nothing in quality here.
-
-**`127.0.0.1` instead of `localhost`.** Median time to open a new connection to Ollama and
-get a reply:
-
-| Address | Time |
-|---|---|
-| `http://localhost:11434` | 2,048 ms |
-| `http://127.0.0.1:11434` | **1.2 ms** |
-
-On Windows, `localhost` resolves to the IPv6 address `::1` first. Ollama listens only on IPv4,
-so every new connection waits two seconds for IPv6 to fail before falling back. The app now
-rewrites `localhost` to `127.0.0.1` for you.
+- **Thinking disabled for local models:** Reasoning models deliberate over simple text cleanup tasks. Disabling thinking brings response time on `qwen3.5 0.8B` from **23.58 s** down to **0.55 s** (43× faster) with identical cleanup quality.
+- **Fast IPv4 connection (`127.0.0.1`):** On Windows, `localhost` attempts IPv6 resolution first, which can delay connection establishment by ~2 seconds before failing over to Ollama. Infinisper automatically rewrites connection URLs to `127.0.0.1`, dropping connection time to **~1.2 ms**.
 
 ---
 
