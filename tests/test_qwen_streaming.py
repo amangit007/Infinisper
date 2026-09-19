@@ -1,7 +1,4 @@
-import queue
-import time
 import numpy as np
-import pytest
 
 from asr import qwen_asr
 from audio import capture as audio_capture
