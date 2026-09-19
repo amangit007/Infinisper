@@ -116,15 +116,9 @@ quiet voices was being cancelled by the click it had failed to remove.
 Three engines, one job. Which runs is your choice; see
 [Choosing a model](choosing-a-model.md).
 
-**Whisper** and **Qwen3-ASR** are batch engines: they get the finished take and transcribe
-it after you release. The wait grows with how long you spoke.
+**Whisper** is a batch engine: it gets the finished take and transcribes it after you release. The wait grows with how long you spoke.
 
-Qwen3 needed one more step for long dictation. It degrades on very long inputs, so any take
-over 18 seconds is split before transcription. The split points come from a second, more
-sensitive VAD pass looking for breath pauses of 300 ms or more, so words aren't cut in half.
-If someone talks without pausing, it falls back to the quietest 50 ms window in range. The
-pieces are transcribed separately and stitched back together, lowercasing the first word of
-a piece when it clearly continues a sentence — but leaving acronyms and "I" alone.
+**Qwen3-ASR** streams via **Dynamic Catch-Up Batching**. Its session begins when you press the hotkey. As speech accumulates, natural breath pauses (~400 ms) or maximum chunk intervals trigger segment dispatches to a background worker while you are still speaking. If incoming speech chunks arrive faster than the model can decode, the worker pulls all accumulated chunks and processes them in a single batch pass via `sherpa_onnx.OfflineRecognizer.decode_streams()`. Offline multi-chunk takes also benefit from batch decoding, cutting multi-chunk decode times nearly in half while keeping post-speech latency down to ~0.6–1.4s. The pieces are stitched back together using smart capitalization rules that preserve acronyms and the pronoun "I".
 
 **Nemotron 3.5** streams. Its session starts the moment you press the hotkey, gets the
 pre-roll buffer immediately, and then receives each 50 ms chunk as PortAudio delivers it.

@@ -82,6 +82,22 @@ class Pipeline:
             except Exception as exc:
                 print(f"Failed to start Nemotron stream ({exc}), falling back to buffer.")
                 rt.stream_session = None
+        elif (
+            settings.use_asr
+            and rt.active_engine == "qwen3"
+            and rt.qwen3 is not None
+            and hasattr(rt.qwen3, "start_stream")
+        ):
+            try:
+                session = rt.qwen3.start_stream(sample_rate=audio_capture.SAMPLE_RATE)
+                if preroll_chunks:
+                    for chunk in preroll_chunks:
+                        session.feed_chunk(chunk)
+                audio_capture.set_chunk_listener(session.feed_chunk)
+                rt.stream_session = session
+            except Exception as exc:
+                print(f"Failed to start Qwen3 stream ({exc}), falling back to buffer.")
+                rt.stream_session = None
 
     def stop_recording(self) -> np.ndarray | None:
         audio_capture.clear_chunk_listener()
@@ -133,9 +149,9 @@ class Pipeline:
             return AsrOutcome(self.run_whisper(audio, steps), "Whisper")
 
         try:
-            if label == "Nemotron" and rt.stream_session is not None:
+            if label in ("Nemotron", "Qwen3") and rt.stream_session is not None:
                 session, rt.stream_session = rt.stream_session, None
-                with timed("Nemotron stream finalize", steps):
+                with timed(f"{label} stream finalize", steps):
                     text = session.finish()
             else:
                 with timed(f"{label} transcribe", steps):

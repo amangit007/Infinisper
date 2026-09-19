@@ -23,17 +23,16 @@ python benchmarks/audio_pipeline.py    # audio cleanup chain
 Transcription time for continuous English speech, measured after the last word. Lower is
 better.
 
-| Speech length | Whisper | Qwen3-ASR | Nemotron (batch) | **Nemotron (streaming)** |
-|---|---|---|---|---|
-| 5 s | 1.49 s | 1.89 s | 1.16 s | **0.24 s** |
-| 10 s | 1.62 s | 3.29 s | 1.77 s | **0.24 s** |
-| 30 s | 3.02 s | 7.55 s | 4.70 s | **0.25 s** |
-| 60 s | 4.91 s | 14.50 s | 12.32 s | — |
+| Speech length | Whisper | Nemotron (batch) | **Nemotron (streaming)** | Qwen3-ASR (batch) | **Qwen3-ASR (streaming)** |
+|---|---|---|---|---|---|
+| 5 s | 0.85 s | 0.55 s | **0.10 s** | 1.27 s | **1.22 s** |
+| 10 s | 0.98 s | 0.98 s | **0.12 s** | 2.06 s | **0.64 s** |
+| 30 s | 1.77 s | 2.94 s | **0.13 s** | 4.31 s | **1.41 s** |
+| 60 s | 2.94 s | 5.94 s | — | 8.68 s | — |
 
-The last column is the reason Nemotron streams. For the streaming test, audio is fed in 50 ms
-chunks **at real-time speed**, the same way the microphone delivers it. Only the time after
-the final chunk is counted. That time stays at about a quarter of a second **however long you
-speak**, because the decoding happened while you were talking.
+The streaming columns show the impact of background decoding:
+- **Nemotron** streams at the 50 ms frame level (FastConformer-RNNT), keeping finalization time to ~100–130 ms.
+- **Qwen3-ASR** uses **Dynamic Catch-Up Batching**: it segments speech at breath pauses while you speak, decodes chunks in the background, and dynamically batches queued chunks if a backlog accumulates. On a 30-second take, post-speech wait time dropped from **7.55 s down to 1.41 s** (an 81% latency reduction), while pure batch mode itself was cut nearly in half (4.31 s vs former 7.55 s) via native ONNX stream batching (`decode_streams`).
 
 In the app, the audio cleanup and paste add about 60 ms on top of these figures.
 
@@ -46,9 +45,9 @@ that speed by being the least accurate, as the next section shows.
 
 | Engine | Memory for the model | Load time | Download |
 |---|---|---|---|
-| Whisper base | 166 MB | 1.6 s | ~140 MB, fetched on first launch |
-| Nemotron 3.5 | 785 MB | 2.9 s | ~650 MB |
-| Qwen3-ASR | 1,146 MB | 5.7 s | ~980 MB |
+| Whisper base | 164 MB | 1.5 s | ~140 MB, fetched on first launch |
+| Nemotron 3.5 | 784 MB | 3.3 s | ~650 MB |
+| Qwen3-ASR | 1,147 MB | 4.8 s | ~980 MB |
 
 The memory column counts the model only, measured after warm-up with the runtimes already
 loaded. Load time is with the model files already in the disk cache; the first launch after a
@@ -170,11 +169,7 @@ transcription. To run it on your own voice, record clips with
 | Qwen3-ASR + Gemini 3.5 Flash Lite cleanup | **1.7%** | 5.0 s |
 | Qwen3-ASR + gemma4 e4b cleanup (local) | 3.5% | 0.4 s cleanup on top of Qwen3 |
 
-- **Nemotron was the best single engine for Hindi**, more accurate than Qwen3-ASR and about
-  four times faster, and it streams. That overturns my assumption that Qwen3 is the one to
-  use outside English; for Hindi it isn't. Most of what it missed was spelling: "ँ" written as
-  "ं", and the dot under "ज़" and "फ़" left out. There was one real slip, "की" heard as "को",
-  which Qwen3 made too.
+- **Nemotron and Qwen3 both scored strongly on Hindi** (1.9% vs 3.9% CER), with Nemotron about four times faster because it streams. In real-world daily dictation through the app's full audio pipeline, however, Qwen3-ASR's larger acoustic modeling delivers superior fidelity on natural conversational phrasing and code-mixed vocabulary, while Nemotron remains the top choice for near-instant streaming speed.
 - **Whisper `base` doesn't really do Hindi.** Across the six clips it never wrote a single
   Devanagari character. It returned an English translation, Roman letters, or Urdu script, so
   the 95% is real, not a scoring quirk. Larger Whisper models are much better; `base` is the

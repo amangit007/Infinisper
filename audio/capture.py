@@ -142,4 +142,4 @@ def stop_recording() -> np.ndarray | None:
 
     if not captured:
         return None
-    return np.concatenate(captured, axis=0).flatten()
+    return np.concatenate([f.flatten() for f in captured], axis=0)

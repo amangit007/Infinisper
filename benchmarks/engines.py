@@ -15,6 +15,12 @@ import json
 import os
 import subprocess
 import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 import time
 import wave
 
@@ -107,13 +113,13 @@ def run_one(name: str) -> dict:
             times.append(time.perf_counter() - t)
         result["batch_s"][seconds] = round(min(times), 3)
 
-    if name == "nemotron":
+    if hasattr(model, "start_stream"):
         # Feed audio at real-time pace in 50 ms chunks, exactly as the microphone does,
         # then time only what's left after "key release".
         result["stream_finalize_s"] = {}
         for seconds in (5, 10, 30):
             audio = speech_of_length(seconds, english)
-            session = model.start_stream(16000, "en")
+            session = model.start_stream(16000, "en") if name == "nemotron" else model.start_stream(16000)
             step, t0 = 800, time.perf_counter()
             for i in range(0, len(audio), step):
                 session.feed_chunk(audio[i : i + step].copy())
