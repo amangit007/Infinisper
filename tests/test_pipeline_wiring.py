@@ -49,8 +49,9 @@ def pipeline(monkeypatch):
         "copy": staticmethod(lambda text: None),
     }))
     monkeypatch.setattr(app, "keyboard", type("K", (), {"send": staticmethod(lambda combo: None)}))
+    monkeypatch.setattr(app, "_restore_clipboard_later", lambda previous, pasted: None)
     monkeypatch.setattr(app, "_use_asr", True)
-    monkeypatch.setattr(app, "_use_multimodal", False)
+    monkeypatch.setattr(app, "_use_cleanup", False)
 
     real_clean = app.audio_preprocessor.clean_speech_audio
     real_trim = app.audio_vad.trim_to_speech

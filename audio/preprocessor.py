@@ -4,9 +4,6 @@ import numpy as np
 # Lowered from the old 0.005 to 0.001 to support soft voices and whispered dictation.
 MIN_SPEECH_RMS = 0.001
 
-# Pre-emphasis factor to boost high frequencies (consonant clarity: /s/, /t/, /k/, /th/)
-PRE_EMPHASIS_COEFF = 0.95
-
 # Target RMS for normalisation (~ -20 dBFS), the conventional operating level for
 # speech fed into a neural ASR encoder.
 TARGET_RMS = 0.1
@@ -47,9 +44,9 @@ def high_pass_filter(audio: np.ndarray, sample_rate: int = 16000, cutoff_hz: flo
     Same recurrence a per-sample loop would evaluate -- y[n] = a*(y[n-1] + x[n] -
     x[n-1]) -- but computed with numpy. Expanding it gives y[n] = a**n * cumsum(b[k] *
     a**-k), except a**-k overflows float64 somewhere past 22000 samples, so the sum is
-    taken in blocks with y carried across the seam. The loop version cost 208 ms on a
-    30 s take, which is a third of the app's entire latency budget spent inside one
-    filter; this is the same filter at a few hundred microseconds.
+    taken in blocks with y carried across the seam. On a 30 s take the loop version
+    measured 134 ms and this one 5.8 ms (23x faster, outputs identical to within 7e-8;
+    see benchmarks/audio_pipeline.py).
     """
     if len(audio) == 0:
         return audio
@@ -84,16 +81,72 @@ def high_pass_filter(audio: np.ndarray, sample_rate: int = 16000, cutoff_hz: flo
     return filtered.astype(audio.dtype, copy=False)
 
 
-def apply_pre_emphasis(audio: np.ndarray, coeff: float = PRE_EMPHASIS_COEFF) -> np.ndarray:
-    """Applies a first-order FIR pre-emphasis filter: y[t] = x[t] - coeff * x[t-1].
-    
-    In slow or whispered speech, vowel fundamentals swamp higher-frequency formants.
-    Pre-emphasis restores the consonant-to-vowel energy ratio so acoustic models
-    can distinguish subtle consonants like /p/, /t/, /k/, /ch/, /s/.
+class StreamingHighPassFilter:
+    """Stateful 1-pole high-pass filter (IIR) for real-time streaming audio chunks.
+
+    Maintains the filter carry state across successive chunk calls so no transient
+    clicks or phase discontinuities occur at chunk seams. Mathematically equivalent
+    to high_pass_filter() evaluated across the continuous stream.
     """
-    if len(audio) <= 1:
-        return audio
-    return np.append(audio[0], audio[1:] - coeff * audio[:-1])
+
+    def __init__(self, sample_rate: int = 16000, cutoff_hz: float = 80.0):
+        rc = 1.0 / (2.0 * np.pi * cutoff_hz)
+        dt = 1.0 / sample_rate
+        self.alpha = float(rc / (rc + dt))
+        self.sample_rate = sample_rate
+        self.cutoff_hz = cutoff_hz
+        self.x_prev = 0.0
+        self.y_prev = 0.0
+        self.initialized = False
+
+    def reset(self):
+        """Resets internal state for a new recording stream."""
+        self.x_prev = 0.0
+        self.y_prev = 0.0
+        self.initialized = False
+
+    def process(self, chunk: np.ndarray) -> np.ndarray:
+        """Filters an incoming 1D float32 audio chunk, returning the high-passed chunk."""
+        if chunk is None or len(chunk) == 0:
+            return chunk
+
+        x = chunk.astype(np.float64, copy=False)
+        n = len(x)
+
+        if not self.initialized:
+            self.x_prev = float(x[0])
+            self.y_prev = float(x[0])
+            self.initialized = True
+            b0 = float(x[0])
+            y_carry = 0.0
+        else:
+            b0 = self.alpha * (float(x[0]) - self.x_prev)
+            y_carry = self.y_prev
+
+        b = np.empty(n, dtype=np.float64)
+        b[0] = b0
+        if n > 1:
+            np.subtract(x[1:], x[:-1], out=b[1:])
+            b[1:] *= self.alpha
+
+        powers = self.alpha ** np.arange(min(n, _HPF_BLOCK))
+        inverse = 1.0 / powers
+
+        filtered = np.empty(n, dtype=np.float64)
+        carry = y_carry
+        for start in range(0, n, _HPF_BLOCK):
+            block = b[start : start + _HPF_BLOCK]
+            count = len(block)
+            scale = powers[:count]
+            segment = scale * np.cumsum(block * inverse[:count])
+            segment += (carry * self.alpha) * scale
+            filtered[start : start + count] = segment
+            carry = segment[-1]
+
+        self.x_prev = float(x[-1])
+        self.y_prev = float(filtered[-1])
+
+        return filtered.astype(chunk.dtype, copy=False)
 
 
 def suppress_transient_click(

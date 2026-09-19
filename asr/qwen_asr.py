@@ -4,6 +4,8 @@ import numpy as np
 import sherpa_onnx
 from huggingface_hub import snapshot_download
 
+from audio import vad
+
 REPO_ID = "cattle12/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25"
 MODEL_DIR = Path(__file__).parent.parent / "models" / "qwen3-asr"
 REQUIRED_FILES = ["conv_frontend.onnx", "encoder.int8.onnx", "decoder.int8.onnx"]
@@ -62,7 +64,61 @@ class Qwen3AsrEngine:
         )
 
     def transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
-        stream = self._recognizer.create_stream()
-        stream.accept_waveform(sample_rate, audio)
-        self._recognizer.decode_stream(stream)
-        return stream.result.text.strip()
+        chunks = vad.chunk_speech_audio(audio, sample_rate=sample_rate, max_chunk_duration=18.0)
+        if not chunks:
+            return ""
+
+        if len(chunks) == 1:
+            stream = self._recognizer.create_stream()
+            stream.accept_waveform(sample_rate, chunks[0])
+            self._recognizer.decode_stream(stream)
+            return stream.result.text.strip()
+
+        results = []
+        for chunk in chunks:
+            stream = self._recognizer.create_stream()
+            stream.accept_waveform(sample_rate, chunk)
+            self._recognizer.decode_stream(stream)
+            text = stream.result.text.strip()
+            if text:
+                results.append(text)
+
+        return stitch_transcription_chunks(results)
+
+
+def stitch_transcription_chunks(texts: list[str]) -> str:
+    """Combines transcribed segments into a coherent sentence, handling spacing and
+    avoiding accidental mid-sentence capitalization at chunk seams.
+    """
+    cleaned = [t.strip() for t in texts if t and t.strip()]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+
+    result = cleaned[0]
+    for nxt in cleaned[1:]:
+        if not nxt:
+            continue
+        # If preceding text ended with sentence-terminal punctuation (. ! ?), keep capitalization
+        ends_terminal = bool(result and result[-1] in ".!?")
+
+        first_word = nxt.split()[0] if nxt.split() else ""
+        # Lowercase the first word if it was mid-sentence, unless it's an acronym (e.g. NASA, API)
+        # or the pronoun "I" / "I'm" / "I'll".
+        should_lowercase = (
+            not ends_terminal
+            and len(first_word) > 1
+            and not first_word.isupper()
+            and first_word != "I"
+            and not first_word.startswith("I'")
+        )
+
+        if should_lowercase:
+            nxt_stitched = nxt[0].lower() + nxt[1:]
+        else:
+            nxt_stitched = nxt
+
+        result = f"{result} {nxt_stitched}"
+
+    return result

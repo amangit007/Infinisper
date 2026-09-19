@@ -75,8 +75,9 @@ def test_high_pass_is_fast_enough_for_a_long_take():
     start = time.perf_counter()
     p.high_pass_filter(audio, SR)
     elapsed_ms = (time.perf_counter() - start) * 1000
-    # The per-sample loop took 208 ms here. Anything near that is a regression to it.
-    assert elapsed_ms < 25, f"high_pass_filter took {elapsed_ms:.1f} ms on a 30 s take"
+    # The per-sample loop took ~134 ms here and this takes ~6 ms. The limit is loose enough
+    # for a slow CI runner, and still well under what the loop would cost on one.
+    assert elapsed_ms < 60, f"high_pass_filter took {elapsed_ms:.1f} ms on a 30 s take"
 
 
 def test_high_pass_handles_empty_and_single_sample():
@@ -86,6 +87,34 @@ def test_high_pass_handles_empty_and_single_sample():
 
 def test_high_pass_preserves_dtype():
     assert p.high_pass_filter(speech_like(0.2), SR).dtype == np.float32
+
+
+def test_streaming_high_pass_matches_batch_filter():
+    audio = speech_like(5.0)
+    ref = p.high_pass_filter(audio, SR)
+
+    for chunk_size in [128, 800, 1024, 1500]:
+        flt = p.StreamingHighPassFilter(SR, cutoff_hz=80.0)
+        chunks = [audio[i : i + chunk_size] for i in range(0, len(audio), chunk_size)]
+        filtered = [flt.process(c) for c in chunks]
+        assembled = np.concatenate(filtered)
+        assert np.allclose(assembled, ref, atol=1e-5), f"Failed for chunk_size {chunk_size}"
+
+
+def test_streaming_high_pass_reset():
+    flt = p.StreamingHighPassFilter(SR)
+    flt.process(speech_like(0.5))
+    assert flt.initialized is True
+    flt.reset()
+    assert flt.initialized is False
+    assert flt.x_prev == 0.0
+    assert flt.y_prev == 0.0
+
+
+def test_streaming_high_pass_empty_and_none():
+    flt = p.StreamingHighPassFilter(SR)
+    assert flt.process(None) is None
+    assert len(flt.process(np.array([], dtype=np.float32))) == 0
 
 
 # --- fix 1: click suppression at the pre-roll boundary ---------------------------

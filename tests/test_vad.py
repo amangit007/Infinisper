@@ -76,3 +76,39 @@ def test_options_match_the_parameters_whisper_already_used():
     assert vad.DEFAULT_OPTIONS.min_speech_duration_ms == 100
     assert vad.DEFAULT_OPTIONS.min_silence_duration_ms == 1500
     assert vad.DEFAULT_OPTIONS.speech_pad_ms == 400
+
+
+def test_chunk_speech_audio_short_take_is_unchanged():
+    audio = speech_like(5.0)
+    chunks = vad.chunk_speech_audio(audio, SR, max_chunk_duration=18.0)
+    assert len(chunks) == 1
+    assert np.array_equal(chunks[0], audio)
+
+
+def test_chunk_speech_audio_empty_and_none():
+    assert vad.chunk_speech_audio(None, SR) == []
+    assert vad.chunk_speech_audio(np.array([], dtype=np.float32), SR) == []
+
+
+def test_chunk_speech_audio_long_take_splits_within_duration():
+    # 40s of speech-like audio
+    long_audio = np.tile(speech_like(2.0), 20)
+    chunks = vad.chunk_speech_audio(long_audio, SR, max_chunk_duration=18.0)
+    assert len(chunks) > 1
+    max_samples = int(18.0 * SR)
+    for c in chunks:
+        assert len(c) <= max_samples
+        assert len(c) > 0
+
+
+def test_chunk_speech_audio_fallback_on_vad_failure(monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("VAD boom")
+
+    monkeypatch.setattr(vad, "get_speech_timestamps", boom)
+    long_audio = np.tile(speech_like(2.0), 15)  # 30s
+    chunks = vad.chunk_speech_audio(long_audio, SR, max_chunk_duration=18.0)
+    assert len(chunks) > 1
+    for c in chunks:
+        assert len(c) <= int(18.0 * SR)
+

@@ -1,11 +1,11 @@
-"""Tests for multimodal error message formatting."""
+"""Tests for AI cleanup error message formatting."""
 
 import json
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
 import litellm
 
-from multimodal.errors import describe_error
+from cleanup.errors import describe_error
 
 MODEL = "gemini-3.8-flash"
 

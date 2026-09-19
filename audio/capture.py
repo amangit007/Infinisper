@@ -15,6 +15,7 @@ _frames: list[np.ndarray] = []
 _preroll: collections.deque = collections.deque(maxlen=PREROLL_CHUNKS)
 _preroll_seconds_used = 0.0
 _chip = None  # optional; wired via set_chip() so this module has no hard UI dependency
+_chunk_listener = None  # optional; wired via set_chunk_listener() for real-time streaming
 
 
 def set_chip(chip):
@@ -23,6 +24,21 @@ def set_chip(chip):
     mic input. Optional -- capture works with no chip attached."""
     global _chip
     _chip = chip
+
+
+def set_chunk_listener(listener):
+    """Registers an optional callback `listener(chunk: np.ndarray)` that is called
+    for each newly captured chunk while recording is active."""
+    global _chunk_listener
+    with _lock:
+        _chunk_listener = listener
+
+
+def clear_chunk_listener():
+    """Unregisters the chunk listener."""
+    global _chunk_listener
+    with _lock:
+        _chunk_listener = None
 
 
 def check_microphone(device=None) -> bool:
@@ -57,11 +73,19 @@ def default_input_device_name() -> str | None:
 
 def _audio_callback(indata, frame_count, time_info, status):
     chunk = indata.copy()
+    listener = None
     with _lock:
         _preroll.append(chunk)
         recording = _recording
         if recording:
             _frames.append(chunk)
+            listener = _chunk_listener
+
+    if recording and listener is not None:
+        try:
+            listener(chunk)
+        except Exception:
+            pass
 
     if recording and _chip is not None:
         level = float(np.sqrt(np.mean(np.square(chunk))))
@@ -88,7 +112,7 @@ def is_recording() -> bool:
         return _recording
 
 
-def start_recording():
+def start_recording() -> list[np.ndarray]:
     """Begins buffering audio, seeded with the last ~0.5s of pre-roll so the
     first spoken words aren't lost to mic/thread startup latency."""
     global _recording, _frames, _preroll_seconds_used
@@ -96,6 +120,7 @@ def start_recording():
         _frames = list(_preroll)
         _preroll_seconds_used = len(_frames) * (BLOCK_SIZE / SAMPLE_RATE)
         _recording = True
+        return list(_frames)
 
 
 def preroll_seconds_used() -> float:
@@ -109,9 +134,10 @@ def preroll_seconds_used() -> float:
 
 
 def stop_recording() -> np.ndarray | None:
-    global _recording
+    global _recording, _chunk_listener
     with _lock:
         _recording = False
+        _chunk_listener = None
         captured = list(_frames)
 
     if not captured:

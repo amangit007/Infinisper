@@ -1,4 +1,3 @@
-import sys
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 

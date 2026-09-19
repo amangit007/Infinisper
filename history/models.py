@@ -7,7 +7,7 @@ OUTCOMES = ("pasted", "skipped_short", "skipped_silence", "skipped_quick", "erro
 @dataclass
 class HistoryEntry:
     timestamp: str  # ISO 8601
-    engine: str  # e.g. "Whisper", "Qwen3", "Nemotron", "... -> Multimodal", "" for skipped/error takes
+    engine: str  # e.g. "Whisper", "Qwen3", "Nemotron", "... -> AI cleanup", "" for skipped/error takes
     outcome: str  # one of OUTCOMES
     total_ms: float
     steps: list[tuple[str, float]] = field(default_factory=list)  # [(label, elapsed_ms), ...]

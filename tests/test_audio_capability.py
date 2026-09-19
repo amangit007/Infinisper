@@ -1,10 +1,10 @@
-"""Tests for multimodal model audio capability detection."""
+"""Tests for AI model audio capability detection."""
 
 import litellm
 import pytest
 
-from multimodal import testing
-from multimodal.testing import (
+from cleanup import testing
+from cleanup.testing import (
     AUDIO_DECLARED,
     AUDIO_SUPPORTED,
     AUDIO_UNKNOWN,
@@ -13,7 +13,7 @@ from multimodal.testing import (
 
 # Aliased: pytest would otherwise collect the imported test_provider_model as a test
 # case and fail trying to fill its `model` argument from a fixture.
-from multimodal.testing import test_provider_model as run_provider_test
+from cleanup.testing import test_provider_model as run_provider_test
 
 MODEL = "gemini/gemini-3.8-flash"
 
@@ -211,3 +211,45 @@ def test_failure_detail_is_readable_not_a_raw_dump(monkeypatch):
 
     assert result.detail.startswith("Google Gemini quota exceeded")
     assert "{" not in result.detail and "litellm." not in result.detail
+
+
+def test_completion_kwargs_disables_thinking_for_ollama():
+    from cleanup.engine import completion_kwargs
+
+    # Direct ollama/ prefix
+    kwargs = completion_kwargs("ollama/qwen3.5:0.8b", None, None)
+    assert kwargs.get("reasoning_effort") == "none"
+    assert kwargs.get("temperature") == 0.0
+
+    # Ollama via base_url with port 11434
+    kwargs_url = completion_kwargs("qwen3.5:0.8b", None, "http://localhost:11434")
+    assert kwargs_url.get("reasoning_effort") == "none"
+    assert kwargs_url["api_base"] == "http://127.0.0.1:11434"
+    assert kwargs_url["model"] == "ollama/qwen3.5:0.8b"
+    assert kwargs_url.get("temperature") == 0.0
+
+    # Non-Ollama models should NOT have reasoning_effort set, but should have temperature 0.0
+    kwargs_gemini = completion_kwargs("gemini/gemini-2.5-flash", "test-key", None)
+    assert "reasoning_effort" not in kwargs_gemini
+    assert kwargs_gemini.get("temperature") == 0.0
+
+    kwargs_openai = completion_kwargs("gpt-4o", "test-key", "https://api.openai.com/v1")
+    assert "reasoning_effort" not in kwargs_openai
+    assert kwargs_openai.get("temperature") == 0.0
+
+
+def test_sanitize_cleanup_text():
+    from cleanup.engine import _sanitize_model_text
+
+    assert _sanitize_model_text("<<<hello world>>>") == "hello world"
+    assert _sanitize_model_text("<hello world>") == "hello world"
+    assert _sanitize_model_text("<<hello world>>") == "hello world"
+    assert _sanitize_model_text("Here is the cleaned text: hello world") == "hello world"
+    assert _sanitize_model_text("User is asking: What is the weather?") == "What is the weather?"
+    assert _sanitize_model_text("<<<User is asking: What is the weather?>>>") == "What is the weather?"
+    assert _sanitize_model_text('  "hello world"  ') == "hello world"
+    # Internal angle brackets (e.g. math) should remain untouched
+    assert _sanitize_model_text("5 < 10 and 10 > 5") == "5 < 10 and 10 > 5"
+    assert _sanitize_model_text("") == ""
+
+

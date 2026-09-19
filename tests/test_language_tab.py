@@ -74,3 +74,63 @@ def test_clearing_the_box_emits_an_empty_list(tab):
     tab.dictionary_edit.setPlainText("")
     tab._emit_custom_words()
     assert emitted == [[]]
+
+
+def test_language_picker_contains_full_catalog(tab):
+    assert tab.lang_combo.count() >= 90
+    codes = [tab.lang_combo.itemData(i) for i in range(tab.lang_combo.count())]
+    assert "auto" in codes
+    assert "en" in codes
+    assert "hi" in codes
+    assert "es" in codes
+    assert "fr" in codes
+    assert "de" in codes
+    assert "ja" in codes
+    assert "zh" in codes
+
+
+def test_changing_language_emits_signal(tab):
+    emitted = []
+    tab.language_changed.connect(emitted.append)
+
+    idx = tab.lang_combo.findData("hi")
+    assert idx >= 0
+    tab.lang_combo.setCurrentIndex(idx)
+    assert emitted == ["hi"]
+
+
+def test_transformation_radio_and_target_combo_interaction(qt_app):
+    widget = LanguageTab({"cleanup_output_mode": "original", "translation_target_language": "es"})
+    assert widget.radio_original.isChecked()
+    assert not widget.radio_transliterate.isChecked()
+    assert not widget.radio_translate.isChecked()
+    assert not widget.target_combo.isEnabled()
+
+    emitted_trans = []
+    widget.transformation_changed.connect(lambda m, t: emitted_trans.append((m, t)))
+
+    # Switch to transliteration
+    widget.radio_transliterate.setChecked(True)
+    assert not widget.target_combo.isEnabled()
+    assert ("transliterate", "es") in emitted_trans
+
+    # Switch to translation
+    widget.radio_translate.setChecked(True)
+    assert widget.target_combo.isEnabled()
+    assert ("translate", "es") in emitted_trans
+
+    # Change target language
+    idx = widget.target_combo.findData("fr")
+    assert idx >= 0
+    widget.target_combo.setCurrentIndex(idx)
+    assert ("translate", "fr") in emitted_trans
+
+    widget.deleteLater()
+
+
+def test_legacy_force_transliteration_config_maps_to_transliterate(qt_app):
+    widget = LanguageTab({"force_english_transliteration": True})
+    assert widget.radio_transliterate.isChecked()
+    assert not widget.target_combo.isEnabled()
+    widget.deleteLater()
+

@@ -3,8 +3,8 @@ import pytest
 
 import app
 from config import DEFAULT_CONFIG
-from multimodal import engine as multimodal_engine
-from multimodal.prompts import (
+from cleanup import engine as cleanup_engine
+from cleanup.prompts import (
     CLEANUP_PROMPT_BASIC,
     TRANSCRIBE_PROMPT_BASIC,
     custom_dictionary_rule,
@@ -136,18 +136,18 @@ def test_auto_language_is_sent_as_none(whisper, monkeypatch):
     assert whisper.kwargs["language"] is None
 
 
-# --- multimodal plumbing ---------------------------------------------------------
+# --- AI cleanup plumbing ---------------------------------------------------------
 
 
-def test_multimodal_text_cleanup_sends_the_dictionary(monkeypatch):
+def test_cleanup_text_cleanup_sends_the_dictionary(monkeypatch):
     captured = {}
 
     def fake_completion(**kwargs):
         captured.update(kwargs)
         raise RuntimeError("stop here -- the prompt is all this test needs")
 
-    monkeypatch.setattr(multimodal_engine.litellm, "completion", fake_completion)
-    multimodal_engine.refine_text_with_multimodal_model(
+    monkeypatch.setattr(cleanup_engine.litellm, "completion", fake_completion)
+    cleanup_engine.refine_text_with_model(
         "some dictated text", model="test/model", custom_words=WORDS, timeout_seconds=5
     )
 
@@ -155,30 +155,30 @@ def test_multimodal_text_cleanup_sends_the_dictionary(monkeypatch):
     assert "Kubernetes" in system_prompt
 
 
-def test_multimodal_cleanup_without_a_dictionary_is_unchanged(monkeypatch):
+def test_cleanup_cleanup_without_a_dictionary_is_unchanged(monkeypatch):
     captured = {}
 
     def fake_completion(**kwargs):
         captured.update(kwargs)
         raise RuntimeError("stop here")
 
-    monkeypatch.setattr(multimodal_engine.litellm, "completion", fake_completion)
-    multimodal_engine.refine_text_with_multimodal_model(
+    monkeypatch.setattr(cleanup_engine.litellm, "completion", fake_completion)
+    cleanup_engine.refine_text_with_model(
         "some dictated text", model="test/model", custom_words=[], timeout_seconds=5
     )
 
     assert captured["messages"][0]["content"] == CLEANUP_PROMPT_BASIC
 
 
-def test_multimodal_audio_transcribe_sends_the_dictionary(monkeypatch):
+def test_cleanup_audio_transcribe_sends_the_dictionary(monkeypatch):
     captured = {}
 
     def fake_completion(**kwargs):
         captured.update(kwargs)
         raise RuntimeError("stop here")
 
-    monkeypatch.setattr(multimodal_engine.litellm, "completion", fake_completion)
-    multimodal_engine.transcribe_with_multimodal_model(
+    monkeypatch.setattr(cleanup_engine.litellm, "completion", fake_completion)
+    cleanup_engine.transcribe_audio_with_model(
         np.zeros(16000, dtype=np.float32),
         16000,
         model="test/model",

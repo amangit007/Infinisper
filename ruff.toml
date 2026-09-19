@@ -1,0 +1,7 @@
+# Only the "pyflakes" rules: unused imports, undefined names, names used before assignment.
+# They found a real bug (a missing `global` that would have killed the hotkey thread on any
+# error) and cost nothing in style opinions.
+extend-exclude = ["local-docs", "models"]
+
+[lint]
+select = ["F"]

@@ -56,11 +56,8 @@ ENGINES = {
             "(~2s for a 7.2s clip at 4 threads)<br>"
             "&bull; Smallest download (~650 MB)<br>"
             "&bull; Broad multilingual coverage, including Hindi<br>"
+            "&bull; Live background streaming decodes audio in real time as you speak<br>"
             "<br><b>Cons</b><br>"
-            "&bull; Fed as one full buffer rather than true live streaming today, "
-            "so its latency advantage isn't fully exposed yet<br>"
-            "&bull; Needs trailing-silence padding to avoid cutting off the last word "
-            "(already handled)<br>"
             "&bull; Occasional language auto-detection misfires, with no way to force "
             "a language through the current integration"
         ),
