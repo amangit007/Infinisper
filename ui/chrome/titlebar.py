@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from ui.assets.mark import mark_pixmap
+from ui.widgets.icon_button import IconButton
 
 _HEIGHT = 38
 _BUTTON_SIZE = (34, 24)
@@ -41,25 +42,22 @@ class TitleBar(QWidget):
 
         layout.addStretch()
 
-        self._minimize_btn = self._make_button("—", "TitleBarButton")
+        self._minimize_btn = self._make_button("minus", "TitleBarButton")
         self._minimize_btn.clicked.connect(self._on_minimize)
         layout.addWidget(self._minimize_btn)
 
-        self._maximize_btn = self._make_button("□", "TitleBarButton")
+        self._maximize_btn = self._make_button("square", "TitleBarButton", size=11)
         self._maximize_btn.clicked.connect(self._on_maximize_restore)
         layout.addWidget(self._maximize_btn)
 
-        self._close_btn = self._make_button("✕", "TitleBarButton")
-        self._close_btn.setObjectName("TitleBarCloseButton")
+        self._close_btn = self._make_button("x", "TitleBarCloseButton")
         self._close_btn.clicked.connect(self.close_requested.emit)
         layout.addWidget(self._close_btn)
 
-    def _make_button(self, text: str, object_name: str) -> QPushButton:
-        button = QPushButton(text)
+    def _make_button(self, icon_name: str, object_name: str, size: int = 14) -> IconButton:
+        button = IconButton(icon_name, size=size, stroke_width=2.0)
         button.setObjectName(object_name)
         button.setFixedSize(*_BUTTON_SIZE)
-        button.setCursor(Qt.PointingHandCursor)
-        button.setFlat(True)
         return button
 
     def apply_theme(self, tokens: dict):

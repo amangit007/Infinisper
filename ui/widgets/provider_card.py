@@ -1,13 +1,13 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from multimodal.catalog import CURATED_PROVIDERS
+from cleanup.catalog import CURATED_PROVIDERS
 
 _LABELS_BY_ID = dict(CURATED_PROVIDERS)
 
 
 class ProviderCard(QWidget):
-    """Row widget representing a configured multimodal provider."""
+    """Row widget representing a configured AI provider."""
 
     edit_requested = Signal(str)  # provider id
 

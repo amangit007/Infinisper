@@ -179,7 +179,7 @@ class SplashScreen(QWidget):
     def set_step(self, label: str, index: int, total: int):
         """Called from app.py at each real boot step -- index is 1-based,
         total is the number of steps in *this* boot (varies: extra ASR engines
-        add a step, multimodal setup does not).
+        add a step, AI cleanup setup does not).
         """
         self._step_label.setText(label)
         progress = index / total if total else 0.0

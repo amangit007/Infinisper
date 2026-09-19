@@ -45,50 +45,61 @@ def _linear_to_srgb(v: float) -> float:
     return min(1.0, max(0.0, v))
 
 
-# Alert / danger colors
-DANGER = oklch_to_hex(0.6, 0.17, 25)
-DANGER_TEXT = oklch_to_hex(0.7, 0.17, 25)
-DANGER_STRONG = oklch_to_hex(0.55, 0.19, 25)
+# Every text color below is held to WCAG AA (4.5:1) against every surface it can sit on, in
+# both themes -- tests/test_theme_contrast.py fails if a token drifts under that.
+# "line2" and "toggle_off" are the non-text colors that must stay visible on a card.
 
 DARK = {
-    "bg": "#16181d",
+    "bg": "#14161b",
     "panel": "#1e2127",
     "panel2": "#242830",
     "panel3": "#2b3038",
-    "line": "#31363f",
-    "line2": "#3b414b",
+    "line": "#343944",
+    "line2": "#3f4550",
     "text": "#e8eaef",
     "text2": "#b3bac6",
-    "dim": "#848c9a",
+    "dim": "#8f97a5",
     "accent": oklch_to_hex(0.72, 0.13, 255),
     "accent_soft": oklch_to_rgba(0.72, 0.13, 255, 0.14),
     "good": oklch_to_hex(0.74, 0.13, 155),
     "good_soft": oklch_to_rgba(0.74, 0.13, 155, 0.14),
     "warn": oklch_to_hex(0.79, 0.13, 80),
     "warn_soft": oklch_to_rgba(0.79, 0.13, 80, 0.14),
+    "danger": oklch_to_hex(0.6, 0.17, 25),
+    "danger_text": oklch_to_hex(0.7, 0.17, 25),
+    "toggle_off": "#646c7a",
     "shadow": "#000000",
     "shadow_alpha": 130,
 }
 
+# Light mode used to be white cards on a barely-off-white background (1.14:1) with a
+# secondary text color at 3.9:1. The background is now visibly tinted so the cards read as
+# cards, and every text color has real margin over 4.5:1.
 LIGHT = {
-    "bg": "#eef0f3",
+    "bg": "#e5e8ee",
     "panel": "#ffffff",
-    "panel2": "#f6f7f9",
-    "panel3": "#eceef2",
-    "line": "#e0e3e8",
-    "line2": "#d2d6dd",
-    "text": "#1a1d23",
-    "text2": "#4a515c",
-    "dim": "#79818e",
-    "accent": oklch_to_hex(0.55, 0.13, 255),
-    "accent_soft": oklch_to_rgba(0.55, 0.13, 255, 0.10),
-    "good": oklch_to_hex(0.55, 0.12, 155),
-    "good_soft": oklch_to_rgba(0.55, 0.12, 155, 0.10),
-    "warn": oklch_to_hex(0.60, 0.12, 70),
-    "warn_soft": oklch_to_rgba(0.60, 0.12, 70, 0.12),
+    "panel2": "#f3f5f8",
+    "panel3": "#e8ebf0",
+    "line": "#d8dde5",
+    "line2": "#c1c8d2",
+    "text": "#191c22",
+    "text2": "#3f4653",
+    "dim": "#586071",
+    "accent": oklch_to_hex(0.50, 0.14, 255),
+    "accent_soft": oklch_to_rgba(0.50, 0.14, 255, 0.10),
+    "good": oklch_to_hex(0.48, 0.12, 155),
+    "good_soft": oklch_to_rgba(0.48, 0.12, 155, 0.10),
+    "warn": oklch_to_hex(0.50, 0.11, 65),
+    "warn_soft": oklch_to_rgba(0.50, 0.11, 65, 0.12),
+    "danger": oklch_to_hex(0.55, 0.19, 25),
+    "danger_text": oklch_to_hex(0.50, 0.18, 25),
+    "toggle_off": "#8b94a1",
     "shadow": "#141923",
-    "shadow_alpha": 46,
+    "shadow_alpha": 60,
 }
+
+# Hover fill for the window's close button; white text sits on it in both themes.
+DANGER_STRONG = oklch_to_hex(0.55, 0.19, 25)
 
 THEMES = {"dark": DARK, "light": LIGHT}
 
@@ -134,19 +145,23 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
         font-weight: 600;
         color: {t['text2']};
     }}
-    QPushButton#TitleBarButton {{
+    QPushButton#TitleBarButton, QPushButton#TitleBarCloseButton {{
         background: transparent;
         border: none;
         border-radius: 5px;
-        color: {t['dim']};
-        font-size: 12px;
+        qproperty-iconColor: {t['text2']};
+        qproperty-hoverIconColor: {t['text']};
     }}
     QPushButton#TitleBarButton:hover {{
         background: {t['panel3']};
     }}
+    QPushButton#TitleBarCloseButton {{
+        /* qproperty-* is applied when the widget is polished, not on :hover, so the white
+           hover icon is set here; hoverIconColor only takes effect while hovered anyway. */
+        qproperty-hoverIconColor: #ffffff;
+    }}
     QPushButton#TitleBarCloseButton:hover {{
         background: {DANGER_STRONG};
-        color: #ffffff;
     }}
 
     QWidget#Sidebar {{
@@ -194,11 +209,10 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
         background: transparent;
         border: 1px solid {t['line2']};
         border-radius: 6px;
-        color: {t['dim']};
-        font-size: 11px;
+        qproperty-iconColor: {t['text2']};
+        qproperty-hoverIconColor: {t['text']};
     }}
     QPushButton#ThemeToggleButton:hover {{
-        color: {t['text']};
         border-color: {t['accent']};
     }}
 
@@ -255,13 +269,22 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
     QPushButton#FooterLink:hover {{
         color: {t['accent']};
     }}
-    QComboBox#DeviceCombo {{
+    /* Every combo box and spin box, not just the ones that happened to get an object name --
+       the dashboard's shortcut, model and timeout controls had none, so in dark mode they
+       fell back to the native white Windows look. */
+    QComboBox, QSpinBox {{
         border: 1px solid {t['line2']};
         border-radius: 7px;
         background: {t['panel2']};
         color: {t['text']};
         padding: 3px 10px;
         font-size: 12px;
+    }}
+    QComboBox:hover, QSpinBox:hover {{
+        border-color: {t['dim']};
+    }}
+    QComboBox:focus, QSpinBox:focus {{
+        border-color: {t['accent']};
     }}
     QLabel#SectionLabel {{
         font-size: 11px;
@@ -308,6 +331,22 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
     QCheckBox::indicator:checked {{
         background: {t['accent']};
         border-color: {t['accent']};
+    }}
+    QRadioButton::indicator {{
+        width: 15px;
+        height: 15px;
+        border: 1.5px solid {t['line2']};
+        border-radius: 9px;
+        background: {t['panel']};
+    }}
+    QRadioButton::indicator:hover {{
+        border-color: {t['accent']};
+    }}
+    QRadioButton::indicator:checked {{
+        border-color: {t['accent']};
+        background: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.5, fx: 0.5, fy: 0.5,
+            stop: 0 {t['accent']}, stop: 0.42 {t['accent']},
+            stop: 0.48 {t['panel']}, stop: 1 {t['panel']});
     }}
 
     QLabel#EngineRowName {{
@@ -461,8 +500,8 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
         padding: 4px 10px;
     }}
     QPushButton#DangerPillButton:hover {{
-        border-color: {DANGER};
-        color: {DANGER_TEXT};
+        border-color: {t['danger']};
+        color: {t['danger_text']};
     }}
     QPushButton#DangerPillButton:disabled {{
         color: {t['dim']};
@@ -472,6 +511,15 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
         color: {t['dim']};
         font-size: 11px;
         padding: 4px 10px;
+    }}
+    QLabel#WarnBadge {{
+        color: {t['warn']};
+        background: {t['warn_soft']};
+        border: 1px solid {t['warn']};
+        border-radius: 4px;
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 1px 6px;
     }}
     QComboBox#SizeCombo {{
         border: 1px solid {t['line2']};
@@ -541,22 +589,35 @@ def build_stylesheet(tokens: dict, maximized: bool = False) -> str:
         border-radius: 4px;
         padding: 2px 6px;
     }}
-    QPushButton#GhostGlyphButton {{
+    QToolButton#InfoButton {{
+        background: transparent;
+        border: 1px solid {t['line2']};
+        border-radius: 9px;
+        color: {t['text2']};
+        font-size: 11px;
+        font-weight: bold;
+    }}
+    QToolButton#InfoButton:hover {{
+        background: {t['accent']};
+        border-color: {t['accent']};
+        color: {t['panel']};
+    }}
+    QPushButton#GhostGlyphButton, QPushButton#DangerGhostGlyphButton {{
         background: transparent;
         border: none;
-        color: {t['dim']};
-        font-size: 11px;
+        border-radius: 5px;
+        qproperty-iconColor: {t['text2']};
+    }}
+    QPushButton#GhostGlyphButton {{
+        qproperty-hoverIconColor: {t['text']};
     }}
     QPushButton#GhostGlyphButton:hover {{
-        color: {t['text']};
+        background: {t['panel3']};
     }}
     QPushButton#DangerGhostGlyphButton {{
-        background: transparent;
-        border: none;
-        color: {t['dim']};
-        font-size: 11px;
+        qproperty-hoverIconColor: {t['danger_text']};
     }}
     QPushButton#DangerGhostGlyphButton:hover {{
-        color: {DANGER_TEXT};
+        background: {t['panel3']};
     }}
     """

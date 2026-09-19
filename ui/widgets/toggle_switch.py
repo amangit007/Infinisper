@@ -2,10 +2,13 @@ from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, Q
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QWidget
 
+from ui.theme import DARK
+
 _WIDTH = 38
 _HEIGHT = 22
 _PADDING = 2
 _KNOB = _HEIGHT - _PADDING * 2
+_KNOB_COLOR = QColor(255, 255, 255)  # white on the accent track and on the grey one, in both themes
 
 
 class ToggleSwitch(QWidget):
@@ -19,8 +22,8 @@ class ToggleSwitch(QWidget):
         self.setCursor(Qt.PointingHandCursor)
         self._checked = False
         self._knob_x = _PADDING
-        self._on_color = QColor("#5b8def")
-        self._off_color = QColor("#3b414b")
+        self._on_color = QColor(DARK["accent"])
+        self._off_color = QColor(DARK["toggle_off"])
 
         self._anim = QPropertyAnimation(self, b"knob_x", self)
         self._anim.setDuration(140)
@@ -81,5 +84,5 @@ class ToggleSwitch(QWidget):
         painter.drawEllipse(shadow_rect)
 
         knob_rect = QRectF(self._knob_x, _PADDING, _KNOB, _KNOB)
-        painter.setBrush(QColor("#ffffff"))
+        painter.setBrush(_KNOB_COLOR)
         painter.drawEllipse(knob_rect)

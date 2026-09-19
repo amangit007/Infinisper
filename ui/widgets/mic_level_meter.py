@@ -5,6 +5,8 @@ from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QWidget
 
+from ui.theme import DARK
+
 _BAR_COUNT = 14
 _REST_HEIGHT_FRACTION = 0.18
 
@@ -18,7 +20,7 @@ class MicLevelMeter(QWidget):
         super().__init__(parent)
         self.setFixedHeight(26)
         self._levels = collections.deque([0.0] * _BAR_COUNT, maxlen=_BAR_COUNT)
-        self._color = QColor("#5ec386")
+        self._color = QColor(DARK["good"])
         self._level_changed.connect(self._on_level_changed)
 
     def set_color(self, hex_color: str):

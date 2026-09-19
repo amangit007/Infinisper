@@ -6,7 +6,12 @@ from PySide6.QtSvg import QSvgRenderer
 
 from ui.theme import oklch_to_hex
 
-BRAND_HEX = "#14588b"
+# The one brand color, used for the README logo and the window/taskbar icon. A mid-tone blue
+# on purpose: it holds at least 3.6:1 against all of GitHub's light and dark page backgrounds
+# and Windows' light and dark taskbars, so no second "dark mode" variant is needed.
+# (The old logo blue, #14588b, was 2.5:1 on GitHub dark -- close to invisible.)
+BRAND_HEX = "#3b82c4"
+# Used on the splash screen only, which is always dark.
 BRAND_ACCENT_DARK_HEX = oklch_to_hex(0.70, 0.105, 245)
 
 # Full detail: clipboard, its pin, the speech bubble, and three waves. Legible

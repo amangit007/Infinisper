@@ -14,17 +14,6 @@ class InfoButton(QToolButton):
         self.setToolTip(info_html)
         self.setCursor(Qt.WhatsThisCursor)
         self.setFixedSize(18, 18)
-        self.setStyleSheet(
-            "QToolButton {"
-            "  border-radius: 9px;"
-            "  border: 1px solid palette(mid);"
-            "  font-weight: bold;"
-            "  font-size: 11px;"
-            "  color: palette(mid);"
-            "}"
-            "QToolButton:hover {"
-            "  background: palette(highlight);"
-            "  color: palette(highlighted-text);"
-            "  border-color: palette(highlight);"
-            "}"
-        )
+        # Colors come from the app stylesheet (ui/theme.py), so the button follows the
+        # in-app light/dark switch rather than the Windows palette.
+        self.setObjectName("InfoButton")

@@ -12,14 +12,15 @@ from PySide6.QtWidgets import (
 
 from audio import capture as audio_capture
 from history.store import HistoryStore
-from ui.assets.mark import BRAND_ACCENT_DARK_HEX, mark_icon
+from ui.assets.mark import BRAND_HEX, mark_icon
 from ui.chrome.sidebar import Sidebar
 from ui.chrome.titlebar import TitleBar
 from ui.tabs.dashboard_tab import DashboardTab
 from ui.tabs.history_tab import HistoryTab
 from ui.tabs.language_tab import LanguageTab
 from ui.tabs.models_tab import ModelsTab
-from ui.theme import THEMES, build_stylesheet
+from ui.theme import DARK, THEMES, build_stylesheet
+from utils.windows import HOTKEY_PRESETS
 
 # Default window dimensions and shadow margins.
 _CONTENT_SIZE = (1320, 864)
@@ -71,7 +72,7 @@ class _ShadowLayer(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.setCursor(Qt.ArrowCursor)
-        self._color = QColor("#16181d")
+        self._color = QColor(DARK["bg"])
         self._radius = _RADIUS
 
     def set_color(self, hex_color: str):
@@ -169,10 +170,11 @@ class _ResizableContainer(QWidget):
 class MainWindow(QMainWindow):
     settings_saved = Signal(dict)
     delete_model_requested = Signal(str)
-    multimodal_changed = Signal()
+    cleanup_changed = Signal()
     activate_engine_requested = Signal(str)
     whisper_model_size_changed = Signal(str)
     language_settings_changed = Signal(bool)  # force_english_transliteration
+    cleanup_transformation_changed = Signal(str, str)  # output_mode, target_language
     dictation_language_changed = Signal(str)  # dictation_language (e.g. 'en', 'auto')
     custom_words_changed = Signal(list)  # custom_words
     engine_status_refresh_requested = Signal(str, bool)  # (active_engine, busy) thread-safe dispatch
@@ -180,7 +182,7 @@ class MainWindow(QMainWindow):
     def __init__(self, current_config: dict, history_store: HistoryStore, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Infinisper")
-        self.setWindowIcon(mark_icon(BRAND_ACCENT_DARK_HEX))
+        self.setWindowIcon(mark_icon(BRAND_HEX))
         self._theme_name = "dark"
         self._maximized = False
         self.engine_status_refresh_requested.connect(
@@ -230,6 +232,8 @@ class MainWindow(QMainWindow):
         self.sidebar.nav_changed.connect(self._on_nav_changed)
         self.sidebar.theme_toggle_requested.connect(self._on_theme_toggle)
         self.sidebar.set_device_caption(_device_caption(current_config.get("input_device")))
+        init_hotkey = current_config.get("hotkey", "ctrl+win")
+        self.sidebar.set_hotkey_caption(HOTKEY_PRESETS.get(init_hotkey, {}).get("display", "Ctrl + Win"))
         body.addWidget(self.sidebar)
 
         self._stack = QStackedWidget()
@@ -243,7 +247,7 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self.dashboard_tab)
 
         self.models_tab = ModelsTab()
-        self.models_tab.changed.connect(self.multimodal_changed.emit)
+        self.models_tab.changed.connect(self.cleanup_changed.emit)
         self.models_tab.activate_engine_requested.connect(self.activate_engine_requested.emit)
         self.models_tab.delete_engine_requested.connect(self.delete_model_requested.emit)
         self.models_tab.whisper_model_size_changed.connect(self.whisper_model_size_changed.emit)
@@ -251,6 +255,7 @@ class MainWindow(QMainWindow):
 
         self.language_tab = LanguageTab(current_config)
         self.language_tab.settings_changed.connect(self.language_settings_changed.emit)
+        self.language_tab.transformation_changed.connect(self.cleanup_transformation_changed.emit)
         self.language_tab.language_changed.connect(self.dictation_language_changed.emit)
         self.language_tab.custom_words_changed.connect(self.custom_words_changed.emit)
         self._stack.addWidget(self.language_tab)
@@ -281,6 +286,10 @@ class MainWindow(QMainWindow):
 
     def _on_settings_saved(self, new_config: dict):
         self.sidebar.set_device_caption(_device_caption(new_config.get("input_device")))
+        hotkey_id = new_config.get("hotkey", "ctrl+win")
+        hotkey_display = HOTKEY_PRESETS.get(hotkey_id, {}).get("display", "Ctrl + Win")
+        self.sidebar.set_hotkey_caption(hotkey_display)
+        self.dashboard_tab.update_hotkey_hint(hotkey_display)
 
     def refresh_engine_statuses(self, active_engine: str, busy: bool):
         """Keeps both the Dashboard's active-engine radio picker and the Models &

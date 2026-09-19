@@ -2,12 +2,14 @@ from PySide6.QtCore import QRectF, QTimer, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
+from ui.theme import DARK
+
 # Diagram dimensions and node bounding boxes.
 _CANVAS_SIZE = (916, 212)
 _MIC_CENTER = (48, 100)
 _MIC_RADIUS = 28
 _ASR_BOX = QRectF(168, 62, 216, 76)
-_MM_BOX = QRectF(456, 62, 216, 76)
+_CLEANUP_BOX = QRectF(456, 62, 216, 76)
 _OUT_BOX = QRectF(744, 62, 172, 76)
 
 _FLOW_DASH = [9, 63]
@@ -25,7 +27,7 @@ def _straight(x1, y1, x2, y2) -> QPainterPath:
 
 
 def _bypass_path() -> QPainterPath:
-    # Mic -> curves under the ASR box -> into the multimodal box's bottom edge.
+    # Mic -> curves under the ASR box -> into the AI cleanup box's bottom edge.
     path = QPainterPath()
     path.moveTo(48, 128)
     path.lineTo(48, 168)
@@ -37,7 +39,7 @@ def _bypass_path() -> QPainterPath:
 
 
 def _skip_path() -> QPainterPath:
-    # ASR box's top edge -> arcs over the multimodal box -> into the output box's top edge.
+    # ASR box's top edge -> arcs over the AI cleanup box -> into the output box's top edge.
     path = QPainterPath()
     path.moveTo(276, 62)
     path.lineTo(276, 44)
@@ -49,7 +51,7 @@ def _skip_path() -> QPainterPath:
 
 
 class PipelineDiagram(QWidget):
-    """Visual pipeline diagram showing audio routing through ASR and multimodal processing."""
+    """Visual pipeline diagram showing audio routing through ASR and AI cleanup processing."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -57,8 +59,8 @@ class PipelineDiagram(QWidget):
 
         self._edges = {
             "mic_asr": _straight(76, 100, 168, 100),
-            "asr_mm": _straight(384, 100, 456, 100),
-            "mm_out": _straight(672, 100, 744, 100),
+            "asr_cleanup": _straight(384, 100, 456, 100),
+            "cleanup_out": _straight(672, 100, 744, 100),
             "bypass": _bypass_path(),
             "skip": _skip_path(),
         }
@@ -66,21 +68,13 @@ class PipelineDiagram(QWidget):
         self._edge_is_long = {"bypass": True, "skip": True}
 
         self._use_asr = True
-        self._use_multimodal = False
+        self._use_cleanup = False
         self._asr_label = "Whisper"
-        self._mm_label = "Off"
+        self._cleanup_label = "Off"
+        self._cleanup_is_local = False
 
-        self._colors = {
-            "line2": QColor("#3b414b"),
-            "accent": QColor("#6aa7f4"),
-            "good": QColor("#5ec386"),
-            "good_soft": QColor(94, 195, 134, 36),
-            "warn": QColor("#e6b14e"),
-            "warn_soft": QColor(230, 177, 78, 36),
-            "panel2": QColor("#242830"),
-            "dim": QColor("#848c9a"),
-            "text": QColor("#e8eaef"),
-        }
+        self._colors: dict[str, QColor] = {}
+        self.apply_theme(DARK)  # until the window applies the real theme
 
         self._flow_phase = 0.0
         self._timer = QTimer(self)
@@ -106,22 +100,32 @@ class PipelineDiagram(QWidget):
         self._colors["text"] = QColor(tokens["text"])
         self.update()
 
-    def set_route(self, use_asr: bool, use_multimodal: bool, asr_label: str, mm_label: str) -> str:
-        """Recomputes which edges are live and returns a one-line route summary."""
+    def set_route(
+        self,
+        use_asr: bool,
+        use_cleanup: bool,
+        asr_label: str,
+        cleanup_label: str,
+        cleanup_is_local: bool = False,
+    ) -> str:
+        """Recomputes which edges are live and returns a one-line route summary.
+        `cleanup_is_local` says whether the AI model runs on this machine (e.g. Ollama),
+        which decides whether the summary can promise that nothing leaves it."""
         self._use_asr = use_asr
-        self._use_multimodal = use_multimodal
+        self._use_cleanup = use_cleanup
         self._asr_label = asr_label
-        self._mm_label = mm_label
+        self._cleanup_label = cleanup_label
+        self._cleanup_is_local = cleanup_is_local
 
-        both = use_asr and use_multimodal
-        asr_only = use_asr and not use_multimodal
-        mm_only = use_multimodal and not use_asr
+        both = use_asr and use_cleanup
+        asr_only = use_asr and not use_cleanup
+        cleanup_only = use_cleanup and not use_asr
 
         self._edge_live = {
             "mic_asr": both or asr_only,
-            "asr_mm": both,
-            "mm_out": both or mm_only,
-            "bypass": mm_only,
+            "asr_cleanup": both,
+            "cleanup_out": both or cleanup_only,
+            "bypass": cleanup_only,
             "skip": asr_only,
         }
         if any(self._edge_live.values()):
@@ -132,11 +136,14 @@ class PipelineDiagram(QWidget):
         self.update()
 
         if both:
-            return f"Mic → {asr_label} → {mm_label} → cursor"
+            route = f"Mic → {asr_label} → {cleanup_label} → cursor"
+            return route + (" · nothing leaves this machine" if cleanup_is_local else "")
         if asr_only:
             return f"Mic → {asr_label} → cursor · nothing leaves this machine"
-        if mm_only:
-            return f"Mic → {mm_label} → cursor · audio leaves this machine"
+        if cleanup_only:
+            return f"Mic → {cleanup_label} → cursor" + (
+                " · nothing leaves this machine" if cleanup_is_local else " · audio leaves this machine"
+            )
         return "Nothing enabled — turn on a stage to dictate"
 
     def _on_tick(self):
@@ -153,9 +160,11 @@ class PipelineDiagram(QWidget):
             painter, _ASR_BOX, "SPEECH RECOGNITION", self._asr_label, "DEVICE",
             self._colors["good"], self._colors["good_soft"], self._use_asr,
         )
+        local = self._cleanup_is_local
         self._paint_stage_box(
-            painter, _MM_BOX, "MULTIMODAL CLEANUP", self._mm_label, "CLOUD",
-            self._colors["warn"], self._colors["warn_soft"], self._use_multimodal,
+            painter, _CLEANUP_BOX, "AI CLEANUP", self._cleanup_label, "LOCAL" if local else "CLOUD",
+            self._colors["good" if local else "warn"], self._colors["good_soft" if local else "warn_soft"],
+            self._use_cleanup,
         )
         self._paint_output_box(painter)
         self._paint_annotations(painter)
@@ -253,7 +262,8 @@ class PipelineDiagram(QWidget):
         painter.setFont(detail_font)
         painter.setPen(self._colors["dim"])
         detail_rect = QRectF(inner.left(), inner.top() + 38, inner.width(), 14)
-        detail = "runs on this device" if title.startswith("SPEECH") else "cloud round trip"
+        on_device = title.startswith("SPEECH") or self._cleanup_is_local
+        detail = "runs on this device" if on_device else "cloud round trip"
         painter.drawText(detail_rect, Qt.AlignLeft | Qt.AlignVCenter, detail if enabled else "skipped")
 
         painter.setOpacity(1.0)

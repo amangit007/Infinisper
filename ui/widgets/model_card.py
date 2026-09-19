@@ -1,9 +1,11 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ui.widgets.icon_button import IconButton
+
 
 class ModelCard(QWidget):
-    """Row widget representing a configured multimodal model."""
+    """Row widget representing a configured AI model."""
 
     rename_requested = Signal(str)  # model id
     delete_requested = Signal(str)  # model id
@@ -57,16 +59,16 @@ class ModelCard(QWidget):
             activate_button.clicked.connect(lambda: self.activate_requested.emit(self.model_id))
             layout.addWidget(activate_button)
 
-        rename_button = QPushButton("✎")
+        rename_button = IconButton("pencil", size=14)
         rename_button.setObjectName("GhostGlyphButton")
-        rename_button.setFixedWidth(20)
+        rename_button.setFixedSize(26, 26)
         rename_button.setToolTip("Rename")
         rename_button.clicked.connect(lambda: self.rename_requested.emit(self.model_id))
         layout.addWidget(rename_button)
 
-        delete_button = QPushButton("×")
+        delete_button = IconButton("x", size=14)
         delete_button.setObjectName("DangerGhostGlyphButton")
-        delete_button.setFixedWidth(20)
+        delete_button.setFixedSize(26, 26)
         delete_button.setToolTip("Delete")
         delete_button.clicked.connect(lambda: self.delete_requested.emit(self.model_id))
         layout.addWidget(delete_button)

@@ -7,13 +7,13 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ui.assets.mark import mark_pixmap
-from ui.theme import MONO_FONT_FAMILY
+from ui.theme import DARK, MONO_FONT_FAMILY
+from ui.widgets.icon_button import IconButton
 from ui.widgets.mic_level_meter import MicLevelMeter
 
 _BRAND_MARK_SIZE = 30
@@ -36,10 +36,10 @@ class _NavRow(QAbstractButton):
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(36)
         self._hover = False
-        self._bg_selected = QColor("#5b8def").lighter(0)
+        self._bg_selected = _parse_rgba(DARK["accent_soft"])
         self._bg_hover = QColor(0, 0, 0, 0)
-        self._fg_selected = QColor("#5b8def")
-        self._fg_default = QColor("#b3bac6")
+        self._fg_selected = QColor(DARK["accent"])
+        self._fg_default = QColor(DARK["text2"])
 
     def apply_theme(self, tokens: dict):
         self._bg_selected = _parse_rgba(tokens["accent_soft"])
@@ -100,7 +100,7 @@ class _BreathingDot(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedSize(7, 7)
-        self._color = QColor("#5ec386")
+        self._color = QColor(DARK["good"])
         self._frame = 0
         self._timer = QTimer(self)
         self._timer.setInterval(140)
@@ -224,12 +224,10 @@ class Sidebar(QWidget):
         self._hotkey_label.setObjectName("SidebarHotkeyText")
         bottom_row.addWidget(self._hotkey_label)
         bottom_row.addStretch()
-        self._theme_button = QPushButton("◑")
+        self._theme_button = IconButton("contrast", size=15)
         self._theme_button.setObjectName("ThemeToggleButton")
-        self._theme_button.setFixedSize(26, 26)
-        self._theme_button.setCursor(Qt.PointingHandCursor)
-        self._theme_button.setFlat(True)
-        self._theme_button.setToolTip("Toggle theme")
+        self._theme_button.setFixedSize(28, 28)
+        self._theme_button.setToolTip("Switch between light and dark")
         self._theme_button.clicked.connect(self.theme_toggle_requested.emit)
         bottom_row.addWidget(self._theme_button)
         outer.addLayout(bottom_row)
@@ -257,6 +255,9 @@ class Sidebar(QWidget):
 
     def set_device_caption(self, text: str):
         self._device_label.setText(text)
+
+    def set_hotkey_caption(self, text: str):
+        self._hotkey_label.setText(text)
 
     def set_listening(self, listening: bool):
         self.mic_meter.set_listening(listening)

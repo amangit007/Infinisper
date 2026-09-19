@@ -1,21 +1,12 @@
-import threading
-from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
-    QApplication,
-    QComboBox,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QMessageBox,
-    QProgressBar,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -24,352 +15,13 @@ from PySide6.QtWidgets import (
 
 from asr import catalog as asr_catalog
 from config import load_config, save_config
-from credentials import delete_api_key, get_api_key, set_api_key
-from multimodal.catalog import (
-    CURATED_PROVIDERS,
-    DEFAULT_OLLAMA_BASE_URL,
-    PROVIDERS_REQUIRING_BASE_URL,
-    list_models_for_provider,
-    probe_ollama,
-)
-from multimodal.engine import TIMEOUT_SECONDS
-from multimodal.testing import AUDIO_DECLARED, AUDIO_UNKNOWN, test_provider_model
+from credentials import delete_api_key
 from ui.widgets.asr_engine_card import EngineTableRow
 from ui.widgets.model_card import ModelCard
 from ui.widgets.provider_card import ProviderCard
 
-_LABELS_BY_ID = dict(CURATED_PROVIDERS)
-
-
-class ProviderDialog(QDialog):
-    """Add/edit dialog for one multimodal provider. The API key is masked by
-    default with an eye-icon toggle to reveal it -- per this project's own
-    design decision, keys are stored securely via keyring and can be revealed
-    in plaintext inside the app's own UI, but stay masked until asked for.
-    See credentials.py.
-    """
-
-    def __init__(self, existing: dict | None, parent=None):
-        super().__init__(parent)
-        self._existing = existing
-        self.result_provider: dict | None = None
-
-        self.result_delete = False
-
-        self.setWindowTitle("Edit provider" if existing else "Add provider")
-        self.setMinimumWidth(420)
-        form = QFormLayout(self)
-
-        self.type_combo = QComboBox()
-        for provider_id, label in CURATED_PROVIDERS:
-            self.type_combo.addItem(label, provider_id)
-        self.custom_type_edit = QLineEdit()
-        self.custom_type_edit.setPlaceholderText("LiteLLM provider prefix, e.g. deepseek")
-
-        if existing:
-            # The type can't change after creation -- the provider's id is
-            # derived from it (used as the keyring username and the key models
-            # reference it by).
-            self.type_combo.setEnabled(False)
-            idx = self.type_combo.findData(existing["id"])
-            if idx < 0:
-                idx = self.type_combo.findData("other")
-                self.custom_type_edit.setText(existing["id"])
-                self.custom_type_edit.setEnabled(False)
-            self.type_combo.setCurrentIndex(idx)
-
-        form.addRow("Provider:", self.type_combo)
-        form.addRow("Custom type:", self.custom_type_edit)
-
-        self.display_name_edit = QLineEdit(existing["display_name"] if existing else "")
-        form.addRow("Display name:", self.display_name_edit)
-
-        self.key_edit = QLineEdit()
-        self.key_edit.setEchoMode(QLineEdit.Password)
-        if existing:
-            current_key = get_api_key(existing["id"])
-            if current_key:
-                self.key_edit.setText(current_key)
-        self.toggle_key_button = QPushButton("\U0001F441")  # eye emoji
-        self.toggle_key_button.setFixedWidth(32)
-        self.toggle_key_button.setCheckable(True)
-        self.toggle_key_button.setToolTip("Show/hide API key")
-        self.toggle_key_button.toggled.connect(self._on_toggle_key_visibility)
-        key_row = QHBoxLayout()
-        key_row.addWidget(self.key_edit)
-        key_row.addWidget(self.toggle_key_button)
-        form.addRow("API key:", key_row)
-
-        self.base_url_edit = QLineEdit((existing or {}).get("base_url") or "")
-        form.addRow("Base URL:", self.base_url_edit)
-
-        self.detect_button = QPushButton("Detect installed models (Ollama)")
-        self.detect_button.clicked.connect(self._on_detect)
-        form.addRow("", self.detect_button)
-
-        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
-        self._on_type_changed()
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        if existing:
-            delete_button = buttons.addButton("Delete provider", QDialogButtonBox.DestructiveRole)
-            delete_button.clicked.connect(self._on_delete)
-        buttons.accepted.connect(self._on_save)
-        buttons.rejected.connect(self.reject)
-        form.addRow(buttons)
-
-    def _on_delete(self):
-        self.result_delete = True
-        self.accept()
-
-    def _on_toggle_key_visibility(self, checked: bool):
-        self.key_edit.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
-
-    def _current_provider_type(self) -> str:
-        provider_id = self.type_combo.currentData()
-        if provider_id == "other":
-            return self.custom_type_edit.text().strip()
-        return provider_id
-
-    def _on_type_changed(self):
-        provider_id = self.type_combo.currentData()
-        self.custom_type_edit.setVisible(provider_id == "other")
-        requires_url = provider_id in PROVIDERS_REQUIRING_BASE_URL
-        self.detect_button.setVisible(provider_id == "ollama")
-        if provider_id == "ollama":
-            # A placeholder hint only -- never auto-filled as real text, so it
-            # disappears the instant the user types their own value, and an
-            # empty field still falls back to this default on save (see _on_save).
-            self.base_url_edit.setPlaceholderText(f"default: {DEFAULT_OLLAMA_BASE_URL}")
-        elif requires_url:
-            self.base_url_edit.setPlaceholderText("required")
-        else:
-            self.base_url_edit.setPlaceholderText("optional")
-
-    def _on_detect(self):
-        base_url = self.base_url_edit.text().strip() or DEFAULT_OLLAMA_BASE_URL
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        try:
-            models = probe_ollama(base_url)
-        except Exception as exc:
-            QApplication.restoreOverrideCursor()
-            QMessageBox.warning(
-                self, "Detect failed", f"Could not reach Ollama at {base_url}:\n{exc}"
-            )
-            return
-        QApplication.restoreOverrideCursor()
-        if models:
-            QMessageBox.information(
-                self, "Detect", f"Found {len(models)} installed model(s):\n" + "\n".join(models)
-            )
-        else:
-            QMessageBox.information(self, "Detect", "Reached Ollama, but no models are installed.")
-
-    def _on_save(self):
-        provider_type = self._current_provider_type()
-        if not provider_type:
-            QMessageBox.warning(
-                self, "Provider required", "Pick a provider, or enter a custom provider type."
-            )
-            return
-
-        base_url = self.base_url_edit.text().strip() or None
-        if provider_type == "ollama" and not base_url:
-            base_url = DEFAULT_OLLAMA_BASE_URL
-        elif provider_type in PROVIDERS_REQUIRING_BASE_URL and not base_url:
-            QMessageBox.warning(self, "Base URL required", f"{provider_type} needs a base URL.")
-            return
-
-        display_name = (
-            self.display_name_edit.text().strip() or _LABELS_BY_ID.get(provider_type, provider_type)
-        )
-        key = self.key_edit.text().strip()
-
-        if key:
-            set_api_key(provider_type, key)
-        elif self._existing is not None:
-            delete_api_key(provider_type)
-
-        self.result_provider = {"id": provider_type, "display_name": display_name, "base_url": base_url}
-        self.accept()
-
-
-class ModelDialog(QDialog):
-    """Add dialog for one provider+model pairing. Save runs a real connection
-    test (multimodal/testing.py) off the main thread and only accepts the
-    dialog if it passes -- per this project's own gating design, "passes"
-    means the text call succeeded, not that a (possibly quiet) test audio
-    clip produced non-empty text.
-    """
-
-    _test_finished = Signal(object)  # TestResult
-
-    def __init__(self, providers: list[dict], parent=None):
-        super().__init__(parent)
-        self._providers = providers
-        self._pending = None
-        self._closed = False
-        self.result_model: dict | None = None
-        self._test_finished.connect(self._on_test_finished)
-
-        self.setWindowTitle("Add model")
-        self.setMinimumWidth(420)
-        form = QFormLayout(self)
-
-        self.provider_combo = QComboBox()
-        for provider in providers:
-            self.provider_combo.addItem(provider["display_name"], provider["id"])
-        self.provider_combo.currentIndexChanged.connect(self._refresh_model_options)
-        form.addRow("Provider:", self.provider_combo)
-
-        self.model_combo = QComboBox()
-        self.model_combo.setEditable(True)
-        form.addRow("Model:", self.model_combo)
-        form.addRow("", QLabel("Pick from the list if one is shown, or type a model id."))
-
-        self.display_name_edit = QLineEdit()
-        form.addRow("Display name:", self.display_name_edit)
-
-        self.status_label = QLabel("")
-        self.status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        # Without word-wrap, a real litellm failure message (often a full sentence
-        # or more -- auth errors, "model not found" with the attempted model name,
-        # etc.) got clipped by the dialog's fixed width instead of shown in full,
-        # which is exactly the "got an error but can't see it" report this fixes.
-        self.status_label.setWordWrap(True)
-        form.addRow("", self.status_label)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # indeterminate/busy mode -- no known duration to show
-        self.progress_bar.setVisible(False)
-        form.addRow("", self.progress_bar)
-
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        self.save_button = self.buttons.button(QDialogButtonBox.Save)
-        self.save_button.setText("Test && Save")
-        self.buttons.accepted.connect(self._on_save_clicked)
-        self.buttons.rejected.connect(self.reject)
-        form.addRow(self.buttons)
-
-        self._refresh_model_options()
-
-    def _current_provider(self) -> dict:
-        provider_id = self.provider_combo.currentData()
-        return next(p for p in self._providers if p["id"] == provider_id)
-
-    def _refresh_model_options(self):
-        provider = self._current_provider()
-        self.model_combo.clear()
-
-        if provider["id"] == "ollama":
-            try:
-                models = probe_ollama(provider.get("base_url") or DEFAULT_OLLAMA_BASE_URL)
-            except Exception:
-                models = []
-        else:
-            models = list_models_for_provider(provider["id"]) or []
-
-        self.model_combo.addItems(models)
-        self.model_combo.setCurrentText("")
-
-    def _on_save_clicked(self):
-        provider = self._current_provider()
-        model = self.model_combo.currentText().strip()
-        if not model:
-            QMessageBox.warning(self, "Model required", "Pick a model, or type a model id.")
-            return
-
-        api_key = get_api_key(provider["id"])
-        base_url = provider.get("base_url")
-
-        provider_id = provider["id"]
-        actual_model = model
-        if provider_id == "ollama" or (base_url and "11434" in str(base_url)):
-            if not actual_model.startswith("ollama/"):
-                actual_model = f"ollama/{actual_model}"
-        elif provider_id and provider_id not in ("other",) and "/" not in actual_model and not actual_model.startswith(f"{provider_id}/"):
-            actual_model = f"{provider_id}/{actual_model}"
-
-        self._pending = (provider, actual_model, model)
-
-        self._set_busy(True)
-        self._set_status(
-            f"Testing connection (this can take up to ~{2 * TIMEOUT_SECONDS}s -- "
-            "a text call, then an audio call)..."
-        )
-
-        def worker():
-            result = test_provider_model(actual_model, api_key, base_url, provider_id=provider_id)
-            self._test_finished.emit(result)
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _set_status(self, text: str, error: bool = False):
-        # This dialog is its own top-level window, so the app's stylesheet never reaches
-        # it -- it paints with the system palette. The fixed palette(mid) grey used before
-        # sat almost exactly on a dark dialog's background and made errors unreadable.
-        # Colours are picked against whichever palette is actually in use.
-        if error:
-            dark = self.palette().color(QPalette.Window).lightness() < 128
-            color = "#ff8b8b" if dark else "#b3261e"
-        else:
-            color = "palette(window-text)"
-        self.status_label.setStyleSheet(f"color: {color};")
-        self.status_label.setText(text)
-
-    def _set_busy(self, busy: bool):
-        self.progress_bar.setVisible(busy)
-        self.save_button.setEnabled(not busy)
-        self.provider_combo.setEnabled(not busy)
-        self.model_combo.setEnabled(not busy)
-        self.display_name_edit.setEnabled(not busy)
-        if busy:
-            QApplication.setOverrideCursor(Qt.WaitCursor)
-        else:
-            QApplication.restoreOverrideCursor()
-
-    def reject(self):
-        # A background test may still be running -- make sure the wait cursor
-        # this dialog set never outlives it, and ignore a test result that
-        # arrives after the user already cancelled.
-        if self.progress_bar.isVisible():
-            QApplication.restoreOverrideCursor()
-        self._closed = True
-        super().reject()
-
-    def _on_test_finished(self, result):
-        if self._closed:
-            return
-        self._set_busy(False)
-        if not result.passed:
-            self._set_status(f"Test failed. {result.detail}", error=True)
-            return
-
-        provider, actual_model, raw_model = self._pending
-        display_name = self.display_name_edit.text().strip() or raw_model
-        self.result_model = {
-            "id": f"{provider['id']}::{actual_model}",
-            "provider_id": provider["id"],
-            "model": actual_model,
-            "display_name": display_name,
-            "supports_audio": result.audio_ok,
-            "audio_status": result.audio_status,
-            "last_tested": datetime.now().isoformat(timespec="seconds"),
-            "test_passed": True,
-        }
-        if result.audio_status == AUDIO_DECLARED:
-            self.status_label.setText(
-                "Test passed. The audio check could not reach the provider, so audio "
-                "support was taken from litellm's catalog -- re-add the model if audio "
-                "dictation then fails."
-            )
-        elif result.audio_status == AUDIO_UNKNOWN:
-            self.status_label.setText(
-                "Test passed, but audio support could not be confirmed. Saved as text-only."
-            )
-        else:
-            self.status_label.setText("Test passed.")
-        self.accept()
+from ui.dialogs.model_dialog import ModelDialog
+from ui.dialogs.provider_dialog import ProviderDialog
 
 
 class EnginesSubTab(QWidget):
@@ -432,7 +84,7 @@ class EnginesSubTab(QWidget):
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(18, 11, 18, 11)
         footer_note = QLabel(
-            "Downloads are resumable and verified. Deleting the active model switches back to Whisper."
+            "Deleting the active model switches back to Whisper."
         )
         footer_note.setObjectName("TableCardFooterNote")
         footer_layout.addWidget(footer_note)
@@ -500,7 +152,7 @@ class EnginesSubTab(QWidget):
 
 
 class ProvidersSubTab(QWidget):
-    """Card widget for managing multimodal provider configurations."""
+    """Card widget for managing AI provider configurations."""
 
     def __init__(self, models_tab: "ModelsTab", parent=None):
         super().__init__(parent)
@@ -598,7 +250,7 @@ class ProvidersSubTab(QWidget):
 
 
 class ModelsSubTab(QWidget):
-    """Card widget for managing multimodal models."""
+    """Card widget for managing AI models."""
 
     def __init__(self, models_tab: "ModelsTab", parent=None):
         super().__init__(parent)
@@ -658,7 +310,7 @@ class ModelsSubTab(QWidget):
                 widget.setParent(None)
                 widget.deleteLater()
 
-        active_id = load_config().get("active_multimodal_model_id")
+        active_id = load_config().get("active_cleanup_model_id")
         models = self._models_tab.models()
         self.empty_label.setVisible(not models)
         for model_entry in models:
@@ -697,7 +349,7 @@ class ModelsSubTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Delete model",
-            "Remove this model from Multimodal Models?",
+            "Remove this model?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -709,7 +361,7 @@ class ModelsSubTab(QWidget):
 
 
 class ModelsTab(QWidget):
-    """Models & providers tab for configuring speech recognition engines and multimodal models."""
+    """Models & providers tab for configuring speech recognition engines and AI models."""
 
     changed = Signal()  # providers/models/active-model changed -- app.py refreshes its runtime cache
     activate_engine_requested = Signal(str)  # engine_id
@@ -743,7 +395,7 @@ class ModelsTab(QWidget):
         title.setObjectName("PageTitle")
         header_layout.addWidget(title)
         hint = QLabel(
-            "Two independent subsystems — speech recognition on device, multimodal through a provider."
+            "Speech recognition runs on this device. AI cleanup is optional."
         )
         hint.setObjectName("PageHint")
         header_layout.addWidget(hint)
@@ -771,7 +423,7 @@ class ModelsTab(QWidget):
         section1.addLayout(
             self._section_heading(
                 "1  Speech recognition",
-                "On-device models shipped with Infinisper. Nothing downloads without a click.",
+                "Nothing downloads until you ask.",
             )
         )
         section1.addWidget(self.engines_subtab)
@@ -781,7 +433,7 @@ class ModelsTab(QWidget):
         section2.setSpacing(12)
         section2.addLayout(
             self._section_heading(
-                "2  Multimodal", "Add a provider first, then the models you want to use from it."
+                "2  AI cleanup", "Add a provider, then a model."
             )
         )
         grid = QHBoxLayout()
@@ -820,10 +472,10 @@ class ModelsTab(QWidget):
         return self.engines_subtab.confirm_and_request_delete(engine_id, is_active)
 
     def providers(self) -> list[dict]:
-        return load_config()["multimodal_providers"]
+        return load_config()["cleanup_providers"]
 
     def models(self) -> list[dict]:
-        return load_config()["multimodal_models"]
+        return load_config()["cleanup_models"]
 
     def provider_display_name(self, provider_id: str) -> str:
         for provider in self.providers():
@@ -833,50 +485,50 @@ class ModelsTab(QWidget):
 
     def save_provider(self, provider: dict):
         config = load_config()
-        others = [p for p in config["multimodal_providers"] if p["id"] != provider["id"]]
-        config["multimodal_providers"] = others + [provider]
+        others = [p for p in config["cleanup_providers"] if p["id"] != provider["id"]]
+        config["cleanup_providers"] = others + [provider]
         save_config(config)
         self._after_change()
 
     def delete_provider(self, provider_id: str):
         config = load_config()
-        config["multimodal_providers"] = [
-            p for p in config["multimodal_providers"] if p["id"] != provider_id
+        config["cleanup_providers"] = [
+            p for p in config["cleanup_providers"] if p["id"] != provider_id
         ]
         remaining_models = [
-            m for m in config["multimodal_models"] if m["provider_id"] != provider_id
+            m for m in config["cleanup_models"] if m["provider_id"] != provider_id
         ]
-        config["multimodal_models"] = remaining_models
-        if config.get("active_multimodal_model_id") not in {m["id"] for m in remaining_models}:
-            config["active_multimodal_model_id"] = None
+        config["cleanup_models"] = remaining_models
+        if config.get("active_cleanup_model_id") not in {m["id"] for m in remaining_models}:
+            config["active_cleanup_model_id"] = None
         delete_api_key(provider_id)
         save_config(config)
         self._after_change()
 
     def activate_model(self, model_id: str):
         config = load_config()
-        config["active_multimodal_model_id"] = model_id
+        config["active_cleanup_model_id"] = model_id
         save_config(config)
         self._after_change()
 
     def save_model(self, model_entry: dict):
         config = load_config()
-        others = [m for m in config["multimodal_models"] if m["id"] != model_entry["id"]]
-        config["multimodal_models"] = others + [model_entry]
+        others = [m for m in config["cleanup_models"] if m["id"] != model_entry["id"]]
+        config["cleanup_models"] = others + [model_entry]
         save_config(config)
         self._after_change()
 
     def delete_model(self, model_id: str):
         config = load_config()
-        config["multimodal_models"] = [m for m in config["multimodal_models"] if m["id"] != model_id]
-        if config.get("active_multimodal_model_id") == model_id:
-            config["active_multimodal_model_id"] = None
+        config["cleanup_models"] = [m for m in config["cleanup_models"] if m["id"] != model_id]
+        if config.get("active_cleanup_model_id") == model_id:
+            config["active_cleanup_model_id"] = None
         save_config(config)
         self._after_change()
 
     def rename_model(self, model_id: str, new_display_name: str):
         config = load_config()
-        for model_entry in config["multimodal_models"]:
+        for model_entry in config["cleanup_models"]:
             if model_entry["id"] == model_id:
                 model_entry["display_name"] = new_display_name
                 break

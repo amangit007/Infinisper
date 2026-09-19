@@ -18,11 +18,21 @@ from PySide6.QtWidgets import (
 
 from asr import catalog as asr_catalog
 from audio import capture as audio_capture
+from cleanup.catalog import is_local_endpoint
 from config import load_config
 from ui.theme import DARK
 from ui.widgets.info_button import InfoButton
 from ui.widgets.pipeline_diagram import PipelineDiagram
 from ui.widgets.toggle_switch import ToggleSwitch
+from utils.windows import HOTKEY_PRESETS
+
+# (label, Ollama keep_alive value). None leaves Ollama's own default (unload after 5 minutes).
+_KEEP_ALIVE_CHOICES = [
+    ("Ollama default (5 min)", None),
+    ("30 minutes", "30m"),
+    ("2 hours", "2h"),
+    ("Until Ollama quits", "-1"),
+]
 
 _ENGINE_DISPLAY_NAMES = {
     "whisper": "Whisper",
@@ -230,13 +240,15 @@ class DashboardTab(QWidget):
         super().__init__(parent)
         self._tokens = DARK
         self._initializing = True
-        self._multimodal_level = current_config.get("multimodal_level", "basic")
+        self._local_by_model_id: dict[str, bool] = {}
+        self._keep_loaded_col = None  # built with the AI cleanup card
+        self._cleanup_level = current_config.get("cleanup_level", "basic")
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        outer.addWidget(self._build_header())
+        outer.addWidget(self._build_header(current_config))
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -256,7 +268,7 @@ class DashboardTab(QWidget):
         controls_grid = QGridLayout()
         controls_grid.setSpacing(16)
         controls_grid.addWidget(self._build_asr_card(current_config), 0, 0)
-        controls_grid.addWidget(self._build_multimodal_card(current_config), 0, 1)
+        controls_grid.addWidget(self._build_cleanup_card(current_config), 0, 1)
         content_layout.addLayout(controls_grid)
 
         content_layout.addWidget(self._build_fallback_row(current_config))
@@ -270,14 +282,14 @@ class DashboardTab(QWidget):
         current_engine = current_config.get("asr_engine", "whisper")
         self.refresh_engine_statuses(current_engine, busy=False)
         self._on_asr_toggled(self.asr_toggle.isChecked())
-        self._on_mm_toggled(self.mm_toggle.isChecked())
+        self._on_mm_toggled(self.cleanup_toggle.isChecked())
         self._apply_level_selection()
 
         self._initializing = False
 
     # ---- construction helpers -------------------------------------------------
 
-    def _build_header(self) -> QWidget:
+    def _build_header(self, current_config: dict = None) -> QWidget:
         header = QWidget()
         header.setObjectName("DashboardHeader")
         header.setFixedHeight(60)
@@ -289,22 +301,28 @@ class DashboardTab(QWidget):
         title.setObjectName("PageTitle")
         layout.addWidget(title)
 
-        hint = QLabel("Hold Ctrl + Win, speak, release — the text lands where your cursor is.")
-        hint.setObjectName("PageHint")
-        layout.addWidget(hint)
+        hotkey_id = (current_config or {}).get("hotkey", "ctrl+win")
+        display_name = HOTKEY_PRESETS.get(hotkey_id, {}).get("display", "Ctrl + Win")
+        self._header_hint = QLabel(f"Hold {display_name}, speak, release — the text lands where your cursor is.")
+        self._header_hint.setObjectName("PageHint")
+        layout.addWidget(self._header_hint)
         layout.addStretch()
 
         return header
+
+    def update_hotkey_hint(self, display_name: str):
+        if hasattr(self, "_header_hint"):
+            self._header_hint.setText(f"Hold {display_name}, speak, release — the text lands where your cursor is.")
 
     def _build_device_row(self, current_config: dict) -> QWidget:
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(12)
 
-        label = QLabel("Microphone")
-        label.setObjectName("SectionLabel")
-        layout.addWidget(label)
+        mic_label = QLabel("Microphone")
+        mic_label.setObjectName("SectionLabel")
+        layout.addWidget(mic_label)
 
         self.device_combo = QComboBox()
         self.device_combo.setObjectName("DeviceCombo")
@@ -313,6 +331,23 @@ class DashboardTab(QWidget):
             self.device_combo.addItem(name, index)
         self._select_device(current_config.get("input_device"))
         layout.addWidget(self.device_combo)
+
+        layout.addSpacing(20)
+
+        hotkey_label = QLabel("Dictation shortcut")
+        hotkey_label.setObjectName("SectionLabel")
+        layout.addWidget(hotkey_label)
+
+        self.hotkey_combo = QComboBox()
+        self.hotkey_combo.setObjectName("HotkeyCombo")
+        current_hotkey = current_config.get("hotkey", "ctrl+win")
+        for hk_id, preset in HOTKEY_PRESETS.items():
+            self.hotkey_combo.addItem(preset["display"], hk_id)
+        idx = self.hotkey_combo.findData(current_hotkey)
+        if idx >= 0:
+            self.hotkey_combo.setCurrentIndex(idx)
+        layout.addWidget(self.hotkey_combo)
+
         layout.addStretch()
         return row
 
@@ -394,13 +429,13 @@ class DashboardTab(QWidget):
 
         # Initial selection is applied later, via refresh_engine_statuses() at the end of
         # __init__ -- setting it here would fire _update_pipeline_preview() (through the
-        # toggled signal above) before the multimodal card exists yet.
+        # toggled signal above) before the AI cleanup card exists yet.
         outer.addWidget(self._asr_body)
 
         outer.addStretch()
         # Whisper's model-size picker and per-engine download/delete controls all live
         # in Models & providers now (Stage 4) -- this card only picks which engine runs.
-        footer = QPushButton("Manage sizes, downloads and deletes in Models & providers →")
+        footer = QPushButton("Manage sizes, downloads and deletes in Models && providers →")
         footer.setObjectName("FooterLink")
         footer.setCursor(Qt.PointingHandCursor)
         footer.setFlat(True)
@@ -411,7 +446,7 @@ class DashboardTab(QWidget):
         self.cards = self.rows
         return card
 
-    def _build_multimodal_card(self, current_config: dict) -> QWidget:
+    def _build_cleanup_card(self, current_config: dict) -> QWidget:
         card = QWidget()
         card.setObjectName("Card")
         card.setAttribute(Qt.WA_StyledBackground, True)
@@ -428,13 +463,14 @@ class DashboardTab(QWidget):
         text_col.setSpacing(2)
         title_row = QHBoxLayout()
         title_row.setSpacing(7)
-        title = QLabel("Multimodal correction")
+        title = QLabel("AI cleanup")
         title.setObjectName("CardTitle")
         title_row.addWidget(title)
         privacy_info = InfoButton(
-            "<b>Text leaves your machine</b><br>"
-            "Transcripts go to your configured provider. Audio stays on device unless "
-            "you route the mic straight to the model."
+            "<b>Where your text goes</b><br>"
+            "To the model you pick. A local model (Ollama) keeps it on this machine; "
+            "a hosted one (Gemini, Groq…) receives the transcript. Audio stays on this "
+            "device unless you send it straight to the model."
         )
         title_row.addWidget(privacy_info)
         title_row.addStretch()
@@ -444,14 +480,14 @@ class DashboardTab(QWidget):
         text_col.addWidget(subtitle)
         header_layout.addLayout(text_col, 1)
 
-        self.mm_toggle = ToggleSwitch()
-        self.mm_toggle.setChecked(current_config.get("use_multimodal", False), animate=False)
-        self.mm_toggle.toggled.connect(self._on_mm_toggled)
-        header_layout.addWidget(self.mm_toggle)
+        self.cleanup_toggle = ToggleSwitch()
+        self.cleanup_toggle.setChecked(current_config.get("use_cleanup", False), animate=False)
+        self.cleanup_toggle.toggled.connect(self._on_mm_toggled)
+        header_layout.addWidget(self.cleanup_toggle)
         outer.addWidget(header)
 
-        self._mm_body = QWidget()
-        body_layout = QVBoxLayout(self._mm_body)
+        self._cleanup_body = QWidget()
+        body_layout = QVBoxLayout(self._cleanup_body)
         body_layout.setContentsMargins(18, 14, 18, 14)
         body_layout.setSpacing(14)
 
@@ -460,12 +496,12 @@ class DashboardTab(QWidget):
         model_label = QLabel("ACTIVE MODEL")
         model_label.setObjectName("SectionLabel")
         model_col.addWidget(model_label)
-        self.multimodal_model_combo = QComboBox()
-        self.multimodal_model_combo.currentIndexChanged.connect(self._update_pipeline_preview)
-        model_col.addWidget(self.multimodal_model_combo)
-        self.refresh_multimodal_models(
-            current_config.get("multimodal_models", []),
-            current_config.get("active_multimodal_model_id"),
+        self.cleanup_model_combo = QComboBox()
+        self.cleanup_model_combo.currentIndexChanged.connect(self._update_pipeline_preview)
+        model_col.addWidget(self.cleanup_model_combo)
+        self.refresh_cleanup_models(
+            current_config.get("cleanup_models", []),
+            current_config.get("active_cleanup_model_id"),
         )
         body_layout.addLayout(model_col)
 
@@ -485,8 +521,8 @@ class DashboardTab(QWidget):
         level_col.addLayout(level_row)
         body_layout.addLayout(level_col)
 
-        self._multimodal_level = (
-            "advanced" if current_config.get("multimodal_level", "basic") == "advanced" else "basic"
+        self._cleanup_level = (
+            "advanced" if current_config.get("cleanup_level", "basic") == "advanced" else "basic"
         )
         self._apply_level_selection()
 
@@ -502,20 +538,43 @@ class DashboardTab(QWidget):
         # cold-starting model can genuinely need more than the default window without
         # the request actually being stuck.
         self.timeout_spinbox.setRange(10, 180)
-        self.timeout_spinbox.setValue(current_config.get("multimodal_timeout_seconds", 60))
+        self.timeout_spinbox.setValue(current_config.get("cleanup_timeout_seconds", 60))
         self.timeout_spinbox.setSuffix("s")
         timeout_row.addWidget(self.timeout_spinbox)
-        timeout_hint = QLabel("How long to wait for the multimodal model before falling back.")
+        timeout_hint = QLabel("How long to wait for the AI model before falling back.")
         timeout_hint.setObjectName("CardSubtitle")
         timeout_hint.setWordWrap(True)
         timeout_row.addWidget(timeout_hint, 1)
         timeout_col.addLayout(timeout_row)
         body_layout.addLayout(timeout_col)
 
-        outer.addWidget(self._mm_body)
+        # Only meaningful for a model running in Ollama -- see _update_keep_loaded_visibility.
+        self._keep_loaded_col = QWidget()
+        keep_col = QVBoxLayout(self._keep_loaded_col)
+        keep_col.setContentsMargins(0, 0, 0, 0)
+        keep_col.setSpacing(7)
+        keep_label = QLabel("KEEP MODEL LOADED")
+        keep_label.setObjectName("SectionLabel")
+        keep_col.addWidget(keep_label)
+        keep_row = QHBoxLayout()
+        keep_row.setSpacing(8)
+        self.keep_alive_combo = QComboBox()
+        for label, value in _KEEP_ALIVE_CHOICES:
+            self.keep_alive_combo.addItem(label, value)
+        idx = self.keep_alive_combo.findData(current_config.get("ollama_keep_alive", "30m"))
+        self.keep_alive_combo.setCurrentIndex(max(idx, 0))
+        keep_row.addWidget(self.keep_alive_combo)
+        keep_hint = QLabel("A loaded model answers fast; it uses memory while loaded.")
+        keep_hint.setObjectName("CardSubtitle")
+        keep_hint.setWordWrap(True)
+        keep_row.addWidget(keep_hint, 1)
+        keep_col.addLayout(keep_row)
+        body_layout.addWidget(self._keep_loaded_col)
+
+        outer.addWidget(self._cleanup_body)
         outer.addStretch()
 
-        footer = QPushButton("Add providers and models in Models & providers →")
+        footer = QPushButton("Add providers and models in Models && providers →")
         footer.setObjectName("FooterLink")
         footer.setCursor(Qt.PointingHandCursor)
         footer.setFlat(True)
@@ -560,10 +619,12 @@ class DashboardTab(QWidget):
 
     def _wire_auto_save(self):
         self.device_combo.currentIndexChanged.connect(self._on_control_changed)
+        self.hotkey_combo.currentIndexChanged.connect(self._on_control_changed)
         self.asr_toggle.toggled.connect(self._on_asr_toggled)
-        self.mm_toggle.toggled.connect(self._on_mm_toggled)
-        self.multimodal_model_combo.currentIndexChanged.connect(self._on_control_changed)
+        self.cleanup_toggle.toggled.connect(self._on_mm_toggled)
+        self.cleanup_model_combo.currentIndexChanged.connect(self._on_control_changed)
         self.timeout_spinbox.valueChanged.connect(self._on_control_changed)
+        self.keep_alive_combo.currentIndexChanged.connect(self._on_control_changed)
         self.fallback_checkbox.toggled.connect(self._on_control_changed)
         for engine_id, row in self.rows.items():
             row.radio.toggled.connect(
@@ -586,11 +647,11 @@ class DashboardTab(QWidget):
             row.apply_theme(tokens)
         self.basic_card.apply_theme(tokens)
         self.advanced_card.apply_theme(tokens)
-        self.asr_toggle.set_colors(tokens["accent"], tokens["line2"])
-        self.mm_toggle.set_colors(tokens["accent"], tokens["line2"])
+        self.asr_toggle.set_colors(tokens["accent"], tokens["toggle_off"])
+        self.cleanup_toggle.set_colors(tokens["accent"], tokens["toggle_off"])
         self.pipeline.apply_theme(tokens)
         self._set_widget_active(self._asr_body, self.asr_toggle.isChecked())
-        self._set_widget_active(self._mm_body, self.mm_toggle.isChecked())
+        self._set_widget_active(self._cleanup_body, self.cleanup_toggle.isChecked())
 
     def _set_widget_active(self, widget: QWidget, active: bool):
         """Visually dims an "off" section without QWidget.setEnabled()."""
@@ -607,18 +668,18 @@ class DashboardTab(QWidget):
                 child.setStyleSheet("" if active else f"color: {t['dim']};")
 
     def _active_model_supports_audio(self) -> bool:
-        active_id = self.multimodal_model_combo.currentData()
+        active_id = self.cleanup_model_combo.currentData()
         if not active_id:
             return False
         config = load_config()
-        for m in config.get("multimodal_models", []):
+        for m in config.get("cleanup_models", []):
             if m["id"] == active_id:
                 return bool(m.get("supports_audio", False))
         return False
 
     def _on_asr_toggled(self, checked: bool):
-        if not checked and self.mm_toggle.isChecked() and not self._active_model_supports_audio():
-            model_name = self.multimodal_model_combo.currentText() or "The active model"
+        if not checked and self.cleanup_toggle.isChecked() and not self._active_model_supports_audio():
+            model_name = self.cleanup_model_combo.currentText() or "The active model"
             QMessageBox.information(
                 self,
                 "Speech Recognition (ASR) Required",
@@ -635,32 +696,35 @@ class DashboardTab(QWidget):
         self._emit_settings_changed()
 
     def _on_mm_toggled(self, checked: bool):
-        self._set_widget_active(self._mm_body, checked)
+        self._set_widget_active(self._cleanup_body, checked)
         self._update_pipeline_preview()
         self._emit_settings_changed()
 
     def _on_level_picked(self, level: str):
-        self._multimodal_level = level
+        self._cleanup_level = level
         self._apply_level_selection()
         self._emit_settings_changed()
 
     def _apply_level_selection(self):
-        self.basic_card.set_selected(self._multimodal_level == "basic")
-        self.advanced_card.set_selected(self._multimodal_level == "advanced")
+        self.basic_card.set_selected(self._cleanup_level == "basic")
+        self.advanced_card.set_selected(self._cleanup_level == "advanced")
 
     def _update_pipeline_preview(self):
         use_asr = self.asr_toggle.isChecked()
-        use_mm = self.mm_toggle.isChecked()
+        use_cleanup = self.cleanup_toggle.isChecked()
         selected_engine = "whisper"
         for engine_id, row in self.rows.items():
             if row.radio.isChecked():
                 selected_engine = engine_id
                 break
         asr_label = _ENGINE_DISPLAY_NAMES.get(selected_engine, selected_engine)
-        mm_label = self.multimodal_model_combo.currentText() or "a multimodal model"
-        route_label = self.pipeline.set_route(use_asr, use_mm, asr_label, mm_label)
-        if use_mm and not use_asr and not self._active_model_supports_audio():
-            route_label += " (⚠️ Model is text-only; enable ASR)"
+        cleanup_label = self.cleanup_model_combo.currentText() or "an AI model"
+        local = self._cleanup_model_is_local()
+        route_label = self.pipeline.set_route(use_asr, use_cleanup, asr_label, cleanup_label, local)
+        if self._keep_loaded_col is not None:
+            self._keep_loaded_col.setVisible(local)
+        if use_cleanup and not use_asr and not self._active_model_supports_audio():
+            route_label += " — this model is text-only, so turn speech recognition back on"
         self._route_label.setText(route_label)
 
     # ---- public API used by app.py --------------------------------------------
@@ -692,20 +756,28 @@ class DashboardTab(QWidget):
                 row.radio.blockSignals(False)
         self._update_pipeline_preview()
 
-    def refresh_multimodal_models(self, models: list[dict], active_id: str | None):
-        self.multimodal_model_combo.blockSignals(True)
-        self.multimodal_model_combo.clear()
+    def _cleanup_model_is_local(self) -> bool:
+        return self._local_by_model_id.get(self.cleanup_model_combo.currentData(), False)
+
+    def refresh_cleanup_models(self, models: list[dict], active_id: str | None):
+        providers = {p["id"]: p for p in load_config().get("cleanup_providers", [])}
+        self._local_by_model_id = {
+            m["id"]: is_local_endpoint(m["model"], providers.get(m["provider_id"], {}).get("base_url"))
+            for m in models
+        }
+        self.cleanup_model_combo.blockSignals(True)
+        self.cleanup_model_combo.clear()
         if not models:
-            self.multimodal_model_combo.addItem("Configure a model in Models & providers", None)
-            self._set_widget_active(self.multimodal_model_combo, False)
+            self.cleanup_model_combo.addItem("Configure a model in Models & providers", None)
+            self._set_widget_active(self.cleanup_model_combo, False)
         else:
-            self._set_widget_active(self.multimodal_model_combo, True)
+            self._set_widget_active(self.cleanup_model_combo, True)
             for model_entry in models:
-                self.multimodal_model_combo.addItem(model_entry["display_name"], model_entry["id"])
-            idx = self.multimodal_model_combo.findData(active_id)
+                self.cleanup_model_combo.addItem(model_entry["display_name"], model_entry["id"])
+            idx = self.cleanup_model_combo.findData(active_id)
             if idx >= 0:
-                self.multimodal_model_combo.setCurrentIndex(idx)
-        self.multimodal_model_combo.blockSignals(False)
+                self.cleanup_model_combo.setCurrentIndex(idx)
+        self.cleanup_model_combo.blockSignals(False)
         self._update_pipeline_preview()
 
     def _emit_settings_changed(self):
@@ -726,10 +798,12 @@ class DashboardTab(QWidget):
                 "model_size": load_config().get("model_size", "base"),
                 "use_asr": self.asr_toggle.isChecked(),
                 "asr_engine": selected_engine,
-                "use_multimodal": self.mm_toggle.isChecked(),
-                "multimodal_level": self._multimodal_level,
-                "multimodal_timeout_seconds": self.timeout_spinbox.value(),
+                "use_cleanup": self.cleanup_toggle.isChecked(),
+                "cleanup_level": self._cleanup_level,
+                "cleanup_timeout_seconds": self.timeout_spinbox.value(),
                 "fallback_to_whisper": self.fallback_checkbox.isChecked(),
-                "active_multimodal_model_id": self.multimodal_model_combo.currentData(),
+                "active_cleanup_model_id": self.cleanup_model_combo.currentData(),
+                "hotkey": self.hotkey_combo.currentData(),
+                "ollama_keep_alive": self.keep_alive_combo.currentData(),
             }
         )
