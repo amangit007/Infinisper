@@ -1,11 +1,11 @@
 import json
-from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
 
 from history.models import HistoryEntry
+from utils.paths import get_history_path
 
-HISTORY_PATH = Path(__file__).parent.parent / "history.json"
+HISTORY_PATH = get_history_path()
 MAX_ENTRIES = 500  # oldest dropped first -- keeps the file from growing forever
 
 

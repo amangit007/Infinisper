@@ -1,4 +1,3 @@
-from pathlib import Path
 
 import numpy as np
 import sherpa_onnx
@@ -9,9 +8,10 @@ import threading
 
 from audio import preprocessor as audio_preprocessor
 from audio import vad
+from utils.paths import get_models_dir
 
 REPO_ID = "cattle12/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25"
-MODEL_DIR = Path(__file__).parent.parent / "models" / "qwen3-asr"
+MODEL_DIR = get_models_dir() / "qwen3-asr"
 REQUIRED_FILES = ["conv_frontend.onnx", "encoder.int8.onnx", "decoder.int8.onnx"]
 
 MIN_STREAM_CHUNK_SECONDS = 3.0

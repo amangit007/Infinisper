@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies & PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build Standalone Executable with PyInstaller
+        run: |
+          pyinstaller --noconfirm --clean infinisper.spec
+
+      - name: Compile Inno Setup Installer
+        run: |
+          if (Get-Command iscc -ErrorAction SilentlyContinue) {
+              iscc installer.iss
+          } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+              & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          } else {
+              choco install innosetup --no-progress
+              iscc installer.iss
+          }
+
+      - name: Create Portable Zip
+        run: |
+          Compress-Archive -Path "dist\Infinisper\*" -DestinationPath "dist-installer\Infinisper-v1.0.0-Portable.zip"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-installer/Infinisper-v1.0.0-Setup.exe
+            dist-installer/Infinisper-v1.0.0-Portable.zip
+          name: Infinisper v1.0.0
+          generate_release_notes: true
+          draft: false
+          prerelease: false
