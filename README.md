@@ -3,112 +3,92 @@
 </p>
 
 <h1 align="center">Infinisper</h1>
-<p align="center"><em>local-first dictation</em></p>
+<p align="center"><em>local-first dictation for Windows</em></p>
 
-**Ultra-fast, private, on-device AI dictation for Windows.**
+<p align="center">
+  <a href="https://github.com/amangit007/infinisper/actions/workflows/tests.yml"><img src="https://github.com/amangit007/infinisper/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+</p>
 
-Hold `Ctrl+Win`, speak naturally, release — your words appear instantly at your cursor in whatever app you are using.
+**Hold a key, speak, release — the text lands wherever your cursor is.**
 
-Unlike cloud dictation tools, transcription in **Infinisper** happens directly on your machine. Your voice never leaves your computer unless you explicitly choose to enable a cloud multimodal model for styling and grammar polish.
-
----
-
-## ⚡ Highlights
-
-- **Instant Dictation Anywhere**: System-wide global hotkey (`Ctrl+Win`) injects text into any editor, browser, IDE, or chat app without losing your typing caret.
-- **Whisper & Nemotron 3.5 ASR**: Powered by `sherpa-onnx` and `faster-whisper` for sub-second, on-device transcription with zero cloud latency.
-- **Robust on Low Voices & Whispers**: Built-in audio preprocessor featuring DC offset removal, 80 Hz high-pass rumble filter, pre-emphasis for crisp consonant clarity, and peak dynamic range normalization.
-- **Wispr-Flow-Style Intelligence**: Optional AI text polishing via local or cloud LLMs (Ollama, Gemini, OpenAI) to eliminate filler words, fix grammar, and format lists into bullet points.
-- **Zero Focus-Stealing Floating Chip**: Non-intrusive glassmorphism status pill at the bottom of your screen that shows real-time microphone level animations without ever taking window focus.
-- **Branded Cold-Start Splash**: The mark's own anatomy — clipboard, speech bubble, sound waves — animates as the loading indicator while the speech model loads, so first launch reads as visible progress instead of a frozen window.
-- **Privacy First**: Audio is held in RAM only during dictation and immediately discarded. API keys are stored in Windows Credential Manager (`keyring`), never in plaintext files.
+Speech recognition runs on your PC. An optional AI step tidies the text — removes "um" and "uh",
+fixes punctuation, turns a spoken list into bullets — and that can run on your PC too, through
+[Ollama](https://ollama.com). No subscription, no account, MIT licensed.
 
 ---
 
-## 🚀 Quick Start
+## Why it feels fast
 
-### 1. Requirements
-- **Windows 10 / 11** (64-bit)
-- **Python 3.10+** (ensure "Add Python to PATH" is checked during installation)
+Time from letting go of the key to finished text, measured on a laptop (Ryzen 7, no dedicated GPU):
 
-### 2. One-Click Setup
-1. Clone or download the repository:
-   ```cmd
-   git clone https://github.com/amangit007/infinisper.git
-   cd infinisper
-   ```
-2. Double-click **`install.bat`** (or run `install.bat` in Command Prompt) to automatically create a virtual environment and install all dependencies.
-3. Launch Infinisper with **`run.bat`** (or run `python main.py`).
+| Setup | Wait |
+|---|---|
+| Nemotron streaming, no cleanup | **0.24 s** — however long you spoke |
+| Nemotron + local Ollama cleanup (qwen 0.5B–0.8B) | **0.56 s** — nothing leaves the machine |
+| Nemotron + Groq (GPT-OSS 120B) | 0.78 s |
+| Nemotron + Gemini 3.5 Flash Lite | 1.02 s |
 
----
+Nemotron transcribes *while you're still talking*, which is why the wait doesn't grow with a longer
+take. Every number comes from a script in [`benchmarks/`](benchmarks) you can run yourself — see
+[Benchmarks](docs/benchmarks.md) for the full tables, including memory use and other languages.
 
-## 🎙️ Speech Recognition Engines
+## What you get
 
-| Engine | Type | Download Size | Best For |
-|---|---|---|---|
-| **Whisper (base / small)** | Local (Offline) | Included in cache (~140MB+) | Default safety-net fallback. Exceptional general English accuracy. |
-| **Nemotron 3.5 ASR (0.6B)** | Local Streaming | ~650 MB | **Ultra-low latency streaming.** FastConformer-RNNT architecture transcribes in 1120ms streaming chunks. |
-| **Qwen3-ASR (0.6B)** | Local (Offline) | ~980 MB | Deep multilingual accuracy and clean punctuation formatting. |
+- **Works in any app.** A global hotkey (`Ctrl+Win` by default, configurable) pastes into Notepad, Chrome, Slack, VS Code — and puts your clipboard back afterwards.
+- **Three speech engines.** Whisper for a quick start, Nemotron for fast everyday English, Qwen3-ASR for accuracy and other languages. Switch any time.
+- **Optional AI cleanup**, your choice of where it runs: local (Ollama), or a hosted model (Gemini, Groq, OpenAI, and others through LiteLLM). It can also translate or write Hindi in Latin script.
+- **Private by default.** Your voice never leaves the machine unless *you* send audio to a cloud model. API keys live in Windows Credential Manager, not in a file.
+- **A small floating indicator** that shows your mic level without taking focus, and a light and dark theme.
 
-Models are downloaded directly on demand with progress bars in the **Models & providers** tab.
+## Install
 
----
+You need Windows 10 or 11 and Python 3.12, 3.13 or 3.14 (tick **Add Python to PATH** when installing it).
 
-## 🛠️ Modes & AI Refinement
+```cmd
+git clone https://github.com/amangit007/infinisper.git
+cd infinisper
+install.bat
+run.bat
+```
 
-1. **Speech-to-Text Only**: Fast, direct transcription from your local ASR engine straight to your cursor.
-2. **Speech + Multimodal Refinement**: The raw transcription is instantly polished by a fast LLM (e.g. Gemini 3.8 Flash, Ollama, etc.) to fix grammar, punctuation, and flow while preserving your meaning.
-3. **Multimodal Direct Audio**: Feeds the raw audio directly to an audio-capable multimodal model for end-to-end interpretation.
+It starts with Whisper. Its small model (about 140 MB) downloads by itself the first time you launch,
+so that first start needs internet; after that it works offline. Faster and more accurate engines are
+a click away in **Models & providers** — nothing else downloads until you ask.
 
----
+## Documentation
 
-## ⌨️ How to Use
+| | |
+|---|---|
+| [Getting started](docs/getting-started.md) | Install, first dictation, the tray menu |
+| [Choosing a model](docs/choosing-a-model.md) | Which speech engine and which cleanup model to pick |
+| [Performance guide](docs/performance-guide.md) | Tested setups and tuning tips |
+| [Benchmarks](docs/benchmarks.md) | Measured speed, memory and accuracy |
+| [How it works](docs/how-it-works.md) | What happens between the hotkey and the paste |
+| [Privacy](docs/privacy.md) | Exactly what leaves your machine, and when |
+| [Troubleshooting](docs/troubleshooting.md) | When something doesn't behave |
 
-1. Place your cursor in any textbox (Notepad, Chrome, Word, Slack, VS Code, etc.).
-2. **Press and hold `Ctrl+Win`**.
-3. Speak your thoughts. The floating pill at the bottom of the screen will show live microphone levels.
-4. **Release `Ctrl+Win`**. The audio is transcribed, formatted, and pasted into your active application.
-5. Use the system tray icon to open settings, pause dictation, switch themes, or exit.
+## Built with
 
----
+| | |
+|---|---|
+| UI | PySide6 (LGPL-3.0, dynamically linked) |
+| Speech | sherpa-onnx (Nemotron, Qwen3-ASR), faster-whisper, Silero VAD — Apache-2.0 / MIT |
+| AI cleanup | LiteLLM (MIT) — Ollama, Gemini, Groq, OpenAI and more |
+| Keys | keyring (MIT) — Windows Credential Manager |
 
-## 🔒 Privacy & Architecture
+## Development
 
-- **Audio Data**: Captured via `sounddevice` at 16 kHz mono float32. Held strictly in memory and wiped immediately after inference.
-- **Keyring Security**: All provider credentials use Windows Credential Manager (`_SERVICE_NAME = "infinisper"`).
-- **Single-Instance Protection**: Built-in local socket lock prevents multiple background instances from colliding over microphone or hotkey access.
+```cmd
+pip install -r requirements-dev.txt
+pytest
+python benchmarks/engines.py
+```
 
-### Third-Party Stack & Licenses
+The tests cover the audio chain, the streaming and chunking logic, the cleanup safeguards, and the
+theme contrast ratios.
 
-| Layer | Library | License | Notes |
-|---|---|---|---|
-| **UI, Overlay & Tray** | `PySide6` | LGPL-3.0 | Official Qt bindings, dynamically linked |
-| **ASR Engines** | `sherpa-onnx`, `faster-whisper` | Apache-2.0 / MIT | On-device streaming & offline transcription |
-| **ONNX Runtime** | `onnxruntime` | MIT | Hardware-accelerated inference backend |
-| **Audio Capture & VAD** | `sounddevice`, Silero VAD | MIT | 16 kHz float32 capture & voice activity detection |
-| **LLM Routing** | `litellm` | MIT | Multi-provider polish and rephrasing |
-| **Credential Storage** | `keyring` | MIT | Windows Credential Manager integration |
+## License
 
----
-
-## 🧪 Development & Testing
-
-1. Activate your virtual environment:
-   ```cmd
-   .venv\Scripts\activate
-   ```
-2. Install test dependencies:
-   ```cmd
-   pip install -r requirements-dev.txt
-   ```
-3. Run the test suite:
-   ```cmd
-   pytest
-   ```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details. Third-party open-source libraries used in this project are listed in the table above and adhere to permissive open-source licenses (MIT, Apache-2.0, BSD-3-Clause, and LGPL-3.0).
-
+[MIT](LICENSE).
