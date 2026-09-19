@@ -2,7 +2,9 @@
 
 import pytest
 
-import app
+from dictation import pipeline as pipeline_module
+from dictation.pipeline import Pipeline
+from dictation.settings import Runtime, Settings
 
 
 class StopLoop(BaseException):
@@ -32,9 +34,11 @@ class FakeTray:
 
 def test_an_error_while_a_streaming_take_is_open_aborts_it_and_keeps_the_loop_alive(monkeypatch):
     """The recovery block used to assign the stream session without declaring it global, so
-    the recovery itself raised UnboundLocalError and the hotkey thread died silently."""
+    the recovery itself raised UnboundLocalError and the hotkey thread died silently. The
+    state now lives on the pipeline, but the recovery path still has to clear it."""
     session = FakeSession()
     chip = FakeChip()
+    pipeline = Pipeline(Settings(), Runtime(stream_session=session))
 
     def boom(hotkey):
         raise RuntimeError("keyboard state unavailable")
@@ -42,14 +46,13 @@ def test_an_error_while_a_streaming_take_is_open_aborts_it_and_keeps_the_loop_al
     def stop_after_recovery(seconds):
         raise StopLoop
 
-    monkeypatch.setattr(app, "_nemotron_stream_session", session)
-    monkeypatch.setattr(app, "is_hotkey_pressed", boom)
-    monkeypatch.setattr(app, "stop_recording", lambda: None)
-    monkeypatch.setattr(app.time, "sleep", stop_after_recovery)
+    monkeypatch.setattr(pipeline_module, "is_hotkey_pressed", boom)
+    monkeypatch.setattr(pipeline, "stop_recording", lambda: None)
+    monkeypatch.setattr(pipeline_module.time, "sleep", stop_after_recovery)
 
     with pytest.raises(StopLoop):  # reached the sleep that follows recovery: the loop is alive
-        app.hotkey_loop(chip, FakeTray(), None)
+        pipeline.hotkey_loop(chip, FakeTray())
 
     assert session.aborted
-    assert app._nemotron_stream_session is None
+    assert pipeline.runtime.stream_session is None
     assert chip.states[-1] == "failed"

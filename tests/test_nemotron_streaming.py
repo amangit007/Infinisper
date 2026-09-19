@@ -4,7 +4,9 @@ import pytest
 
 from asr import nemotron_asr
 from audio import capture as audio_capture
-import app
+from dictation import paste
+from dictation.pipeline import Pipeline
+from dictation.settings import Runtime, Settings
 
 
 def test_chunk_listener_lifecycle():
@@ -72,29 +74,26 @@ def test_nemotron_streaming_session_abort():
 
 def test_whisper_and_qwen_unaffected_by_streaming_hooks(monkeypatch):
     """Ensures Whisper and Qwen3 engines never activate or depend on the Nemotron streaming session."""
-    monkeypatch.setattr(app, "_history_store", None)
-    monkeypatch.setattr(app, "pyperclip", type("P", (), {
+    monkeypatch.setattr(paste, "pyperclip", type("P", (), {
         "paste": staticmethod(lambda: ""),
         "copy": staticmethod(lambda text: None),
     }))
-    monkeypatch.setattr(app, "keyboard", type("K", (), {"send": staticmethod(lambda combo: None)}))
-    monkeypatch.setattr(app, "_use_asr", True)
-    monkeypatch.setattr(app, "_use_cleanup", False)
+    monkeypatch.setattr(paste, "keyboard", type("K", (), {"send": staticmethod(lambda combo: None)}))
+    pipeline = Pipeline(Settings(use_asr=True, use_cleanup=False), Runtime(active_engine="whisper"))
 
     # 1. Test Whisper mode
-    monkeypatch.setattr(app, "_asr_engine", "whisper")
     fake_chip = type("C", (), {"set_state": lambda s, state: None})()
     fake_tray = type("T", (), {"set_status": lambda s, status: None})()
 
-    app.start_recording(fake_chip, fake_tray)
-    assert app._nemotron_stream_session is None
+    pipeline.start_recording(fake_chip, fake_tray)
+    assert pipeline.runtime.stream_session is None
     assert audio_capture._chunk_listener is None
     audio_capture.stop_recording()
 
     # 2. Test Qwen3 mode
-    monkeypatch.setattr(app, "_asr_engine", "qwen3")
-    monkeypatch.setattr(app, "_qwen3_engine", type("Q", (), {})())
-    app.start_recording(fake_chip, fake_tray)
-    assert app._nemotron_stream_session is None
+    pipeline.runtime.active_engine = "qwen3"
+    pipeline.runtime.qwen3 = type("Q", (), {})()
+    pipeline.start_recording(fake_chip, fake_tray)
+    assert pipeline.runtime.stream_session is None
     assert audio_capture._chunk_listener is None
     audio_capture.stop_recording()

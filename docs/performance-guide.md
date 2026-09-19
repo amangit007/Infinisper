@@ -13,7 +13,8 @@ you want to tune.
 | **To start right now, lowest memory** | Whisper | Off |
 | **Better accuracy, still low memory** | Whisper or Nemotron | Gemini 3.5 Flash Lite (free tier) |
 | **Fully local, fast** — closest to Wispr Flow | Nemotron | A small Ollama model |
-| **Languages other than English** | Qwen3-ASR | Optional |
+| **French, German, Chinese, Japanese** | Qwen3-ASR | Optional |
+| **Hindi** | Nemotron | Optional; a hosted model fixes spelling best |
 
 ---
 
@@ -22,12 +23,14 @@ you want to tune.
 **Nemotron is the everyday engine.** It's faster than Whisper *and* more accurate in
 English. It transcribes while you speak, so there's almost nothing left to do when you
 release the key. Its weak spot is other languages — outside English, results drop off
-noticeably.
+noticeably in some languages, though not in Hindi: on six sentences read aloud, it made
+fewer mistakes than Qwen3-ASR and was four times faster
+([the numbers](benchmarks.md#hindi-measured-on-a-real-voice)).
 
-**Qwen3-ASR is the most accurate, and the slowest.** It's the one to use for non-English
-speech — it's been tried with French, Chinese and Hindi and was clearly better than
-Nemotron at all three. The quality feels closer to a large cloud model that takes audio
-directly than to a typical local speech engine.
+**Qwen3-ASR is the most accurate for most other languages, and the slowest.** In a spot
+check it beat Nemotron and Whisper on French, German, Chinese and Japanese. The quality
+feels closer to a large cloud model that takes audio directly than to a typical local
+speech engine.
 
 It handles long takes, but it works best if you **speak in shorter stretches** —
 a sentence or two, release, continue. Long recordings are split at natural pauses and

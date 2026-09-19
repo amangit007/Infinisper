@@ -167,9 +167,56 @@ against the sentence actually spoken. Full transcripts are below the table.
 | Japanese | ✗ two wrong words | ✗ two wrong words | ✓ one small slip |
 | Spanish | ✗ second half garbled | ✗ partly garbled | ✗ partly garbled |
 
-Qwen3 was the best of the three on four of the five. That matches everyday use: switch to
-Qwen3 when you're not dictating in English. Spanish tripped up every engine. It's also the
-lowest-quality recording of the set.
+Qwen3 was the best of the three on four of the five, so it's the one to try first for
+French, German, Chinese and Japanese. Hindi, measured properly below, went the other way.
+Spanish tripped up every engine. It's also the lowest-quality recording of the set.
+
+### Hindi, measured on a real voice
+
+The spot check above is five sentences from sample clips. For Hindi there's a proper test: six
+sentences I read aloud into the laptop microphone, scored by **character error rate** (CER: the
+share of characters that differ from what I actually said; 0% is perfect). Punctuation and
+capitalisation are ignored. Audio goes through the same cleanup the app applies before
+transcription. To run it on your own voice, record clips with
+`python benchmarks/record_clips.py hi`, then `python benchmarks/accuracy.py hi`.
+
+| System | CER ↓ | Median time per clip |
+|---|---|---|
+| Whisper base | 94.7% | 0.6 s |
+| **Nemotron** | **1.9%** | **0.9 s** |
+| Qwen3-ASR | 3.9% | 3.4 s |
+| Gemini 3.5 Flash Lite, audio sent directly | 3.9% | 2.6 s |
+| Qwen3-ASR + Gemini 3.5 Flash Lite cleanup | **1.7%** | 5.0 s |
+| Qwen3-ASR + gemma4 e4b cleanup (local) | 3.5% | 0.4 s cleanup on top of Qwen3 |
+
+- **Nemotron was the best single engine for Hindi**, more accurate than Qwen3-ASR and about
+  four times faster, and it streams. That overturns my assumption that Qwen3 is the one to
+  use outside English; for Hindi it isn't. Most of what it missed was spelling: "ँ" written as
+  "ं", and the dot under "ज़" and "फ़" left out. There was one real slip, "की" heard as "को",
+  which Qwen3 made too.
+- **Whisper `base` doesn't really do Hindi.** Across the six clips it never wrote a single
+  Devanagari character. It returned an English translation, Roman letters, or Urdu script, so
+  the 95% is real, not a scoring quirk. Larger Whisper models are much better; `base` is the
+  one the app starts with.
+- **Cleanup helps, but only a little, and mostly by fixing spelling.** Gemini brought Qwen3
+  from 3.9% to 1.7%. The local gemma4 e4b, through the app's real cleanup prompt, brought it
+  from 3.9% to 3.5%, and it took 0.4 s per clip with thinking disabled. It fixed real
+  mistakes ("क्रिप्या" → "कृपया", "को" → "की"). It also turned spoken numbers into digits
+  ("दस" → "10"), which is what the cleanup prompt is meant to do but which counts against it
+  here, since I spelled them out. And on one clip it dropped a word that Qwen3 had misheard,
+  rather than fixing it.
+- **Code-mixed Hindi and English** ("कल का deployment postpone हो गया…", three sentences) isn't
+  scored, because there's no single correct spelling for the English words. Nemotron wrote
+  them in Devanagari ("डिप्लॉयमेंट", "पोस्टपोन"); Qwen3 did too, with a couple of odd
+  spellings ("डिप्लोमेंट"); Whisper `base` repeated one word dozens of times on the first
+  sentence. Full outputs are in
+  [`benchmarks/accuracy_hi.json`](../benchmarks/accuracy_hi.json).
+
+**Limits of this test:** six sentences, one speaker, one microphone, so differences of a
+percentage point or two are noise. The Gemini rows are timed on a hosted service, so they
+vary with load. The local-cleanup row comes from a separate script,
+[`accuracy_local_ollama.py`](../benchmarks/accuracy_local_ollama.py), which sends Qwen3's output
+through Ollama; its ASR half ran slower (4 to 5 s per clip) because the app was open beside it.
 
 <details>
 <summary>Full transcripts</summary>

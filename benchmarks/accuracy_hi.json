@@ -1,0 +1,414 @@
+{
+ "language": "hi",
+ "systems": {
+  "Whisper, language auto-detected": {
+   "clips": [
+    {
+     "clip": "01.wav",
+     "reference": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "output": "Today the weather is very good, let's go to the park in the evening.",
+     "seconds": 1.2,
+     "cer": 1.0175
+    },
+    {
+     "clip": "02.wav",
+     "reference": "कल सुबह दस बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुँचें।",
+     "output": "GAL SEBHA DAS BHAJE HAMARI TEAM KIEM KIEM TEAM KRIPYA SAMAYE PARPA HUNCHAYE",
+     "seconds": 1.25,
+     "cer": 1.1034
+    },
+    {
+     "clip": "03.wav",
+     "reference": "मुझे बाज़ार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "output": "مجھے بزار سے دو کلو آلویک ایک درزن کے لے اور تھوڑا دوڑھ لنا ہے",
+     "seconds": 1.07,
+     "cer": 0.8852
+    },
+    {
+     "clip": "04.wav",
+     "reference": "भारत की राजधानी नई दिल्ली है और यहाँ की आबादी बहुत ज़्यादा है।",
+     "output": "بھارت کو رازدھانی نہیں دلی ہے اور یہاں کی آبادی بہت زیادہ ہے",
+     "seconds": 1.08,
+     "cer": 0.8689
+    },
+    {
+     "clip": "05.wav",
+     "reference": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "output": "I have bought a new laptop, but its battery gets finished quickly.",
+     "seconds": 0.87,
+     "cer": 0.9531
+    },
+    {
+     "clip": "06.wav",
+     "reference": "अगर तुम्हें कोई परेशानी हो तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "output": "اگر تمہیں کوئی پریشانی ہو تو مجھے فون کر دے نہ میں مدد کروں گا",
+     "seconds": 0.99,
+     "cer": 0.8548
+    }
+   ],
+   "mixed": [
+    {
+     "clip": "01.wav",
+     "reference": "कल का deployment postpone हो गया क्योंकि production में एक bug मिला।",
+     "output": "Kalka, Diploimant, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSP",
+     "seconds": 2.79
+    },
+    {
+     "clip": "02.wav",
+     "reference": "मैंने meeting के notes Slack पर share कर दिए हैं, please एक बार check कर लेना।",
+     "output": "I have shared the notes of the meeting on Slack. Please check once.",
+     "seconds": 0.97
+    },
+    {
+     "clip": "03.wav",
+     "reference": "इस feature को next sprint में ले लेते हैं, अभी testing बाकी है।",
+     "output": "this feature ko next sprint me le le te hi abhi testing baki hai",
+     "seconds": 0.92
+    }
+   ],
+   "mean_cer": 0.9472,
+   "median_seconds": 1.0750000000000002
+  },
+  "Whisper, language set to hi": {
+   "clips": [
+    {
+     "clip": "01.wav",
+     "reference": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "output": "Today the weather is very good, let's go to the park in the evening.",
+     "seconds": 0.51,
+     "cer": 1.0175
+    },
+    {
+     "clip": "02.wav",
+     "reference": "कल सुबह दस बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुँचें।",
+     "output": "GAL SEBHA DAS BHAJE HAMARI TEAM KIEM KIEM TEAM KRIPYA SAMAYE PARPA HUNCHAYE",
+     "seconds": 0.66,
+     "cer": 1.1034
+    },
+    {
+     "clip": "03.wav",
+     "reference": "मुझे बाज़ार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "output": "مجھے بزار سے دو کلو آلویک ایک درزن کے لے اور تھوڑا دوڑھ لنا ہے",
+     "seconds": 0.66,
+     "cer": 0.8852
+    },
+    {
+     "clip": "04.wav",
+     "reference": "भारत की राजधानी नई दिल्ली है और यहाँ की आबादी बहुत ज़्यादा है।",
+     "output": "بھارت کو رازدھانی نہیں دلی ہے اور یہاں کی آبادی بہت زیادہ ہے",
+     "seconds": 0.61,
+     "cer": 0.8689
+    },
+    {
+     "clip": "05.wav",
+     "reference": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "output": "I have bought a new laptop, but its battery gets finished quickly.",
+     "seconds": 0.48,
+     "cer": 0.9531
+    },
+    {
+     "clip": "06.wav",
+     "reference": "अगर तुम्हें कोई परेशानी हो तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "output": "اگر تمہیں کوئی پریشانی ہو تو مجھے فون کر دے نہ میں مدد کروں گا",
+     "seconds": 0.63,
+     "cer": 0.8548
+    }
+   ],
+   "mixed": [
+    {
+     "clip": "01.wav",
+     "reference": "कल का deployment postpone हो गया क्योंकि production में एक bug मिला।",
+     "output": "Kalka, Diploimant, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSPON, POSP",
+     "seconds": 2.5
+    },
+    {
+     "clip": "02.wav",
+     "reference": "मैंने meeting के notes Slack पर share कर दिए हैं, please एक बार check कर लेना।",
+     "output": "I have shared the notes of the meeting on Slack. Please check once.",
+     "seconds": 0.5
+    },
+    {
+     "clip": "03.wav",
+     "reference": "इस feature को next sprint में ले लेते हैं, अभी testing बाकी है।",
+     "output": "this feature ko next sprint me le le te hi abhi testing baki hai",
+     "seconds": 0.51
+    }
+   ],
+   "mean_cer": 0.9472,
+   "median_seconds": 0.62
+  },
+  "Nemotron": {
+   "clips": [
+    {
+     "clip": "01.wav",
+     "reference": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "output": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं",
+     "seconds": 0.78,
+     "cer": 0.0
+    },
+    {
+     "clip": "02.wav",
+     "reference": "कल सुबह दस बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुँचें।",
+     "output": "कल सुबह दस बजे हमारी टीम की मीटिंग है कृपया समय पर पहुंचें",
+     "seconds": 0.8,
+     "cer": 0.0172
+    },
+    {
+     "clip": "03.wav",
+     "reference": "मुझे बाज़ार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "output": "मुझे बाजार से दो किलो आलू एक दर्जन के ले और थोड़ा दूध लाना है",
+     "seconds": 0.88,
+     "cer": 0.0328
+    },
+    {
+     "clip": "04.wav",
+     "reference": "भारत की राजधानी नई दिल्ली है और यहाँ की आबादी बहुत ज़्यादा है।",
+     "output": "भारत को राजधानी नई दिल्ली है और यहां की आबादी बहुत ज्यादा है",
+     "seconds": 1.0,
+     "cer": 0.0492
+    },
+    {
+     "clip": "05.wav",
+     "reference": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "output": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है",
+     "seconds": 0.92,
+     "cer": 0.0
+    },
+    {
+     "clip": "06.wav",
+     "reference": "अगर तुम्हें कोई परेशानी हो तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "output": "अगर तुम्हें कोई परेशानी हो तो मुझे फोन कर देना, मैं मदद करूँगा",
+     "seconds": 0.88,
+     "cer": 0.0161
+    }
+   ],
+   "mixed": [
+    {
+     "clip": "01.wav",
+     "reference": "कल का deployment postpone हो गया क्योंकि production में एक bug मिला।",
+     "output": "कल का डिप्लॉयमेंट पोस्टपोन हो गया क्योंकि प्रोडक्शन में एक बग मिला",
+     "seconds": 0.65
+    },
+    {
+     "clip": "02.wav",
+     "reference": "मैंने meeting के notes Slack पर share कर दिए हैं, please एक बार check कर लेना।",
+     "output": "मैंने मीटिंग के नोट्स स्लैक पर शेयर कर दिए हैं, प्लीज एक बार चेक कर लेना",
+     "seconds": 0.99
+    },
+    {
+     "clip": "03.wav",
+     "reference": "इस feature को next sprint में ले लेते हैं, अभी testing बाकी है।",
+     "output": "इस फीचर को नेक्स्ट स्प्रिंट में ले लेते हैं।  अभी टेस्टिंग बाकी है",
+     "seconds": 0.76
+    }
+   ],
+   "mean_cer": 0.0192,
+   "median_seconds": 0.88
+  },
+  "Qwen3-ASR": {
+   "clips": [
+    {
+     "clip": "01.wav",
+     "reference": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "output": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं.",
+     "seconds": 3.38,
+     "cer": 0.0
+    },
+    {
+     "clip": "02.wav",
+     "reference": "कल सुबह दस बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुँचें।",
+     "output": "कल सुबह दस बजे हमारी टीम की मीटिंग है, क्रिप्या समय पर पहुंचें.",
+     "seconds": 3.11,
+     "cer": 0.0862
+    },
+    {
+     "clip": "03.wav",
+     "reference": "मुझे बाज़ार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "output": "मुझे बाजार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है.",
+     "seconds": 3.61,
+     "cer": 0.0164
+    },
+    {
+     "clip": "04.wav",
+     "reference": "भारत की राजधानी नई दिल्ली है और यहाँ की आबादी बहुत ज़्यादा है।",
+     "output": "भारत को राजधानी नई दिल्ली है और यहां की आबादी बहुत ज्यादा है.",
+     "seconds": 3.47,
+     "cer": 0.0492
+    },
+    {
+     "clip": "05.wav",
+     "reference": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "output": "मैं नया लैपटॉप खरीदा है, लेकिन उसकी बैटरी जल्दी खत्म हो जाती है.",
+     "seconds": 3.81,
+     "cer": 0.0312
+    },
+    {
+     "clip": "06.wav",
+     "reference": "अगर तुम्हें कोई परेशानी हो तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "output": "अगर तुम हे कोई परेशानी हो तो मुझे फ़ोन कर देना मैं मदद करूंगा",
+     "seconds": 3.15,
+     "cer": 0.0484
+    }
+   ],
+   "mixed": [
+    {
+     "clip": "01.wav",
+     "reference": "कल का deployment postpone हो गया क्योंकि production में एक bug मिला।",
+     "output": "कल का डिप्लोमेंट पोस्पोन हो गया, क्योंकि प्रोडक्शन में एक बग मिला.",
+     "seconds": 3.12
+    },
+    {
+     "clip": "02.wav",
+     "reference": "मैंने meeting के notes Slack पर share कर दिए हैं, please एक बार check कर लेना।",
+     "output": "मैंने मिटिंग के नोट्स स्लैग पर शेयर कर दिए हैं। प्लीज एक बार चेक कर लेना।",
+     "seconds": 3.98
+    },
+    {
+     "clip": "03.wav",
+     "reference": "इस feature को next sprint में ले लेते हैं, अभी testing बाकी है।",
+     "output": "इस फीचर को नेक्स्ट स्प्रिंट में ले लेते हैं, अभी टेस्टिंग बाकी है.",
+     "seconds": 3.38
+    }
+   ],
+   "mean_cer": 0.0386,
+   "median_seconds": 3.425
+  },
+  "gemini-3.5-flash-lite, audio sent directly": {
+   "clips": [
+    {
+     "clip": "01.wav",
+     "reference": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "output": "आज मौसम बहुत अच्छा है। चलो शाम को पार्क में घूमने चलते हैं।",
+     "seconds": 3.08,
+     "cer": 0.0
+    },
+    {
+     "clip": "02.wav",
+     "reference": "कल सुबह दस बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुँचें।",
+     "output": "कल सुबह 10:00 बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुंचे।",
+     "seconds": 2.13,
+     "cer": 0.1207
+    },
+    {
+     "clip": "03.wav",
+     "reference": "मुझे बाज़ार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "output": "मुझे बाजार से 2 किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "seconds": 2.15,
+     "cer": 0.0492
+    },
+    {
+     "clip": "04.wav",
+     "reference": "भारत की राजधानी नई दिल्ली है और यहाँ की आबादी बहुत ज़्यादा है।",
+     "output": "भारत की राजधानी नई दिल्ली है और यहां की आबादी बहुत ज्यादा है।",
+     "seconds": 2.54,
+     "cer": 0.0328
+    },
+    {
+     "clip": "05.wav",
+     "reference": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "output": "मैंने नया लैपटॉप खरीदा है, लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "seconds": 2.59,
+     "cer": 0.0
+    },
+    {
+     "clip": "06.wav",
+     "reference": "अगर तुम्हें कोई परेशानी हो तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "output": "अगर तुम्हें कोई परेशानी हो, तो मुझे फोन कर देना। मैं मदद करूंगा।",
+     "seconds": 2.56,
+     "cer": 0.0323
+    }
+   ],
+   "mixed": [
+    {
+     "clip": "01.wav",
+     "reference": "कल का deployment postpone हो गया क्योंकि production में एक bug मिला।",
+     "output": "कल का डिप्लॉयमेंट पोस्टपोन हो गया क्योंकि प्रोडक्शन में एक बग मिला।",
+     "seconds": 2.99
+    },
+    {
+     "clip": "02.wav",
+     "reference": "मैंने meeting के notes Slack पर share कर दिए हैं, please एक बार check कर लेना।",
+     "output": "मैंने मीटिंग के नोट्स स्लैक पर शेयर कर दिए हैं। प्लीज एक बार चेक कर लेना।",
+     "seconds": 3.13
+    },
+    {
+     "clip": "03.wav",
+     "reference": "इस feature को next sprint में ले लेते हैं, अभी testing बाकी है।",
+     "output": "इस फीचर को नेक्स्ट स्प्रिंट में ले लेते हैं। अभी टेस्टिंग बाकी है।",
+     "seconds": 2.18
+    }
+   ],
+   "mean_cer": 0.0392,
+   "median_seconds": 2.55
+  },
+  "Qwen3-ASR + gemini-3.5-flash-lite cleanup": {
+   "clips": [
+    {
+     "clip": "01.wav",
+     "reference": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "output": "आज मौसम बहुत अच्छा है, चलो शाम को पार्क में घूमने चलते हैं।",
+     "seconds": 5.03,
+     "cer": 0.0
+    },
+    {
+     "clip": "02.wav",
+     "reference": "कल सुबह दस बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुँचें।",
+     "output": "कल सुबह 10 बजे हमारी टीम की मीटिंग है, कृपया समय पर पहुंचें।",
+     "seconds": 4.6,
+     "cer": 0.0517
+    },
+    {
+     "clip": "03.wav",
+     "reference": "मुझे बाज़ार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "output": "मुझे बाजार से दो किलो आलू, एक दर्जन केले और थोड़ा दूध लाना है।",
+     "seconds": 4.98,
+     "cer": 0.0164
+    },
+    {
+     "clip": "04.wav",
+     "reference": "भारत की राजधानी नई दिल्ली है और यहाँ की आबादी बहुत ज़्यादा है।",
+     "output": "भारत की राजधानी नई दिल्ली है और यहां की आबादी बहुत ज्यादा है।",
+     "seconds": 4.93,
+     "cer": 0.0328
+    },
+    {
+     "clip": "05.wav",
+     "reference": "मैंने नया लैपटॉप खरीदा है लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "output": "मैंने नया लैपटॉप खरीदा है, लेकिन उसकी बैटरी जल्दी खत्म हो जाती है।",
+     "seconds": 5.67,
+     "cer": 0.0
+    },
+    {
+     "clip": "06.wav",
+     "reference": "अगर तुम्हें कोई परेशानी हो तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "output": "अगर तुम्हें कोई परेशानी हो, तो मुझे फ़ोन कर देना, मैं मदद करूँगा।",
+     "seconds": 4.91,
+     "cer": 0.0
+    }
+   ],
+   "mixed": [
+    {
+     "clip": "01.wav",
+     "reference": "कल का deployment postpone हो गया क्योंकि production में एक bug मिला।",
+     "output": "कल का डिप्लोमेंट पोस्टपोन हो गया, क्योंकि प्रोडक्शन में एक बग मिला।",
+     "seconds": 4.72
+    },
+    {
+     "clip": "02.wav",
+     "reference": "मैंने meeting के notes Slack पर share कर दिए हैं, please एक बार check कर लेना।",
+     "output": "मैंने मीटिंग के नोट्स स्लैक पर शेयर कर दिए हैं। प्लीज़ एक बार चेक कर लेना।",
+     "seconds": 5.62
+    },
+    {
+     "clip": "03.wav",
+     "reference": "इस feature को next sprint में ले लेते हैं, अभी testing बाकी है।",
+     "output": "इस फीचर को नेक्स्ट स्प्रिंट में ले लेते हैं, अभी टेस्टिंग बाकी है।",
+     "seconds": 4.92
+    }
+   ],
+   "mean_cer": 0.0168,
+   "median_seconds": 4.955
+  }
+ },
+ "timing_note": "The hosted-model rows originally included a 4 s rate-limit pause inside the timer; it was subtracted from each clip. accuracy.py no longer times the pause."
+}
