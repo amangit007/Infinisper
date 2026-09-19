@@ -38,7 +38,9 @@ local-docs/
 # Build & distribution
 build/
 dist/
+dist-installer/
 *.spec
+!infinisper.spec
 *.egg-info/
 
 # Logs

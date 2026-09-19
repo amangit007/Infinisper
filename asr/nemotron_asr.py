@@ -1,15 +1,15 @@
 import queue
 import threading
-from pathlib import Path
 
 import numpy as np
 import sherpa_onnx
 from huggingface_hub import snapshot_download
 
 from audio import preprocessor as audio_preprocessor
+from utils.paths import get_models_dir
 
 REPO_ID = "csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11"
-MODEL_DIR = Path(__file__).parent.parent / "models" / "nemotron-3.5-asr"
+MODEL_DIR = get_models_dir() / "nemotron-3.5-asr"
 REQUIRED_FILES = ["tokens.txt", "encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx"]
 
 # Trailing silence padding to ensure the final chunk is fully decoded.

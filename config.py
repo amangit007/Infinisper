@@ -1,8 +1,9 @@
 import copy
 import json
-from pathlib import Path
 
-CONFIG_PATH = Path(__file__).parent / "config.json"
+from utils.paths import get_config_path
+
+CONFIG_PATH = get_config_path()
 
 DEFAULT_CONFIG = {
     "model_size": "base",

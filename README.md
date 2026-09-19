@@ -3,51 +3,70 @@
 </p>
 
 <h1 align="center">Infinisper</h1>
-<p align="center"><strong>Free, open-source & local-first Wispr Flow alternative for Windows.</strong></p>
-<p align="center"><em>Hold a key, speak anywhere, release — clean, polished text appears at your cursor in ~0.5s.</em></p>
+<p align="center"><strong>Instant ~0.24s Streaming Voice Typing for Windows (No GPU Required).</strong></p>
+<p align="center"><em>Hold a key, speak naturally, release — clean, AI-polished text lands at your cursor in a fraction of a second. 100% offline & private.</em></p>
 
 <p align="center">
+  <a href="https://github.com/amangit007/infinisper/releases/latest"><img src="https://img.shields.io/github/v/release/amangit007/infinisper?color=0078d4&label=release" alt="latest release"></a>
   <a href="https://github.com/amangit007/infinisper/actions/workflows/tests.yml"><img src="https://github.com/amangit007/infinisper/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
-  <img src="https://img.shields.io/badge/python-3.12%20|%203.13%20|%203.14-3776ab" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
   <img src="https://img.shields.io/badge/privacy-100%25%20local-success" alt="100% Local">
   <img src="https://img.shields.io/badge/hardware-runs%20on%20CPU-blueviolet" alt="Runs on CPU">
 </p>
 
 <p align="center">
+  <a href="https://github.com/amangit007/infinisper/releases/latest">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.0_Setup.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
+  </a>
+  &nbsp;
+  <a href="https://github.com/amangit007/infinisper/releases/latest">
+    <img src="https://img.shields.io/badge/Download_Portable-v1.0.0_Zip-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Download Portable">
+  </a>
+</p>
+
+<p align="center">
   <img src="assets/demo.gif" width="860" alt="Holding Ctrl+Win and speaking a sentence: the floating pill shows the mic level, then the cleaned-up text appears in Notepad">
 </p>
 
-Wispr Flow made hold-to-talk voice dictation feel effortless, but a paid monthly subscription and streaming your live microphone audio to third-party cloud servers isn't for everyone.
+Most voice dictation tools on Windows force you to compromise:
+1. **Cloud Dictation (e.g. Wispr Flow):** Makes you pay a monthly recurring subscription and streams your live microphone audio to remote servers.
+2. **Standard Whisper Wrappers:** Process audio in batch mode, forcing you to wait 3–5 seconds after speaking for the model to finish decoding on your CPU.
 
-**Infinisper gives you that same seamless dictation experience on Windows — completely free, open source, and running on your own PC.**
-
-- **Runs on your CPU**: Core speech recognition streams in real time on standard consumer CPUs without requiring a dedicated GPU.
-- **Optional local AI polish**: Pair it with [Ollama](https://ollama.com) to strip filler words ("um", "uh"), fix grammar, and format bulleted lists entirely offline.
-- **Private by default**: Audio is processed in RAM and discarded immediately. No recordings saved to disk, no cloud accounts, and zero telemetry.
+**Infinisper is engineered differently: a dedicated, real-time streaming speech engine that processes 50 ms audio chunks in RAM *while you are still speaking*. By the time your finger leaves the hotkey, 95% of the transcription is already completed.**
 
 ---
 
-## How it compares
+## The 5 Core Unfair Advantages
 
-| Feature | Infinisper | Cloud Dictation (e.g. Wispr Flow) | Typical Whisper Wrappers |
+* ⚡ **Instant Response (~0.24s Latency on CPU):** Powered by Nemotron 3.5 streaming ASR via `sherpa-onnx`. Zero waiting for batch decodes, even on standard Intel & AMD CPUs without a dedicated GPU.
+* 🛡️ **Zero Lost Words (500ms Pre-Roll Ring Buffer):** A circular memory buffer in RAM ensures your first syllable is never truncated if you speak the exact millisecond you press the hotkey.
+* 📋 **Non-Destructive Clipboard:** Pastes into any app but automatically restores whatever code snippet, regex, or password you had previously copied.
+* 🌐 **Multilingual & Code-Mixing Champion:** Integrates Qwen3-ASR for complex code-mixed speech (e.g. Hinglish, multilingual European/Asian languages) where Whisper frequently hallucinates.
+* 🎙️ **Studio Audio Pipeline:** 23×-vectorized 80 Hz rumble filter, mechanical keyboard click notch filter, and Silero VAD for acoustic isolation.
+
+---
+
+## How It Compares
+
+| Feature | Infinisper | Cloud Dictation (Wispr Flow) | Typical Whisper Wrappers |
 |---|---|---|---|
-| **Pricing** | **Free & Open Source (MIT)** | Paid subscription (~$5+/month) | Free / Open Source |
-| **Speech Recognition** | **100% Local (Runs on CPU)** | Cloud servers | Local or Cloud |
-| **Latency** | **~0.24s (Streaming ASR)** | ~1.0s | 2–8s (Batch waits for take to finish) |
-| **Hardware Needed** | **Standard Intel / AMD CPU** | Any (Cloud-based) | Often needs high-end NVIDIA GPU |
-| **AI Formatting & Cleanup** | **Local via Ollama** (or Cloud) | Cloud AI | None (raw transcription only) |
+| **Pricing** | **Free & Open Source (MIT)** | Paid subscription (~$12–$15/mo) | Free / Open Source |
+| **Speech Recognition** | **100% Local (Runs on CPU)** | Remote cloud servers | Local or Cloud |
+| **Latency** | **~0.24s (Streaming ASR)** | ~1.0s (Network round-trip) | 2–8s (Batch waits for audio to end) |
+| **Hardware Needed** | **Standard Intel / AMD CPU** | Any (Cloud-based) | Often requires NVIDIA GPU |
+| **First-Word Truncation** | **None (500ms pre-roll buffer)** | Rare | Very common (mic start delay) |
+| **Clipboard Safety** | **Restores previous clipboard** | Direct hook / paste | Overwrites system clipboard |
+| **AI Formatting & Polish** | **Local via Ollama** (or Cloud) | Cloud AI | None (raw text only) |
 | **Audio Privacy** | **100% Local (RAM only)** | Sent to remote servers | 100% Local |
-| **Clipboard Safety** | **Preserves & restores previous clipboard** | Direct hook / paste | Often overwrites clipboard |
 
 ---
 
-## Why it feels instant (even on CPU)
+## Why It Feels Instant (Even on CPU)
 
-Most offline speech tools use batch processing: you speak for 20 seconds, release the key, and then wait several seconds while the model decodes the full audio.
+Most offline speech tools use batch processing: you speak for 20 seconds, release the key, and then wait several seconds while the model decodes the full audio file.
 
-Infinisper uses **real-time streaming speech recognition**. It processes 50 ms audio chunks *while you are still speaking*. By the time your finger leaves the hotkey, 95% of the transcription is already completed.
+Infinisper uses **real-time streaming speech recognition**. It processes 50 ms audio chunks *while you are still speaking*. 
 
 ### Measured response times (key release → text pasted)
 
@@ -57,7 +76,7 @@ Measured on a standard laptop CPU (Ryzen 7, 8 cores). The speech engine runs **p
 |---|---|---|---|
 | **Speech to Text** | Nemotron (Streaming ASR) | **CPU** | **~0.24 s** *(constant, however long you spoke)* |
 | **Optional AI Cleanup** | Ollama (e.g. Qwen 0.5B–1.5B) | Local CPU / GPU | **+ 0.30–0.50 s** *(nothing leaves PC)* |
-| **Optional Cloud Cleanup** | Groq or Gemini 3.5 Flash Lite | Free Cloud API | + 0.50–0.80 s |
+| **Optional Cloud Cleanup** | Groq or Gemini Flash Lite | Free Cloud API | + 0.50–0.80 s |
 
 > **Total time from releasing the hotkey to formatted text:**
 > - **~0.24 s** with local speech recognition alone (raw verbatim text)
@@ -67,32 +86,20 @@ Measured on a standard laptop CPU (Ryzen 7, 8 cores). The speech engine runs **p
 
 ---
 
-## What makes it great
+## Quick Start
 
-- **Works in any application:** Press your global hotkey (`Ctrl+Win` by default, configurable to `Right Ctrl`, `F8`, etc.) in VS Code, Chrome, Slack, Notion, Word, or Windows Terminal.
-- **Non-destructive clipboard:** Pastes via Windows clipboard but immediately restores whatever snippet, password, or code you had copied beforehand.
-- **Pre-roll ring buffer:** Constantly keeps a rolling half-second audio buffer in memory, so you can speak the exact millisecond you press the hotkey without your first word getting cut off.
-- **Studio-grade audio pipeline:** Automatically removes DC offset, applies a 23×-vectorized 80 Hz rumble filter, notches out mechanical key clicks, and trims silence with Silero VAD before decoding.
-- **Three local speech engines to choose from:**
-  - **Nemotron 3.5 ASR**: Ultra-fast real-time streaming, near-instant latency (~0.2s), and solid accuracy for English and fast Hindi dictation.
-  - **Qwen3-ASR**: Overall accuracy champion across multilingual dictation (French, German, Chinese, Japanese, and complex/code-mixed Hindi).
-  - **Whisper (base / small)**: Lightweight starter engine that works immediately with minimal memory.
-- **Accuracy regulation in the Language tab:**
-  - Set your dictation language explicitly for instant model guidance.
-  - Add names, project acronyms, and technical jargon to the built-in dictionary so they are never misheard.
-- **Flexible processing modes:** Speech-only (pure local speed), Speech + Cleanup (local ASR + Ollama/cloud polish), or Direct Audio-to-AI (routes audio straight to multimodal models like Gemini for **zero local model RAM usage** on low-spec PCs).
-- **Lightweight floating pill:** Clean minimalist overlay showing live mic levels and dictation status that never steals window focus. Supports light and dark mode.
+### Option A: Single-Click Windows Installer (Recommended)
 
----
+1. Download **[`Infinisper-v1.0.0-Setup.exe`](https://github.com/amangit007/infinisper/releases/latest)** from the releases page.
+2. Run the installer and launch Infinisper.
+3. Put your cursor in any application, hold **`Ctrl + Win`**, speak, and release.
 
-## Quick start (under 2 minutes)
+### Option B: Run from Source (Developers)
 
-### Requirements
+#### Requirements
 - **Windows 10 or 11** (64-bit)
-- **Python 3.12, 3.13, or 3.14** (ensure **"Add Python to PATH"** is checked during installation)
-- Standard multi-core CPU (no dedicated GPU required)
-
-### Setup
+- **Python 3.12, 3.13, or 3.14** (ensure **"Add Python to PATH"** is checked)
+- Standard multi-core CPU (no GPU required)
 
 ```cmd
 git clone https://github.com/amangit007/infinisper.git
@@ -106,6 +113,8 @@ run.bat
 3. Put your cursor in any app, hold **`Ctrl + Win`**, speak, and release.
 
 Infinisper starts with Whisper out of the box (downloads a lightweight ~140 MB model on first launch). To enable real-time streaming, head to **Models & providers** in the app and click to download **Nemotron 3.5**.
+
+---
 
 ### Recommended: Local AI cleanup with Ollama
 
@@ -130,6 +139,7 @@ Comprehensive guides covering setup, tuning, and internal architecture:
 | [Performance Guide](docs/performance-guide.md) | CPU optimization, latency tuning, and recommended setups |
 | [Benchmarks](docs/benchmarks.md) | Verified latency, memory usage, and multilingual accuracy benchmarks |
 | [How It Works](docs/how-it-works.md) | Audio engineering, ring buffers, streaming architecture, and paste mechanics |
+| [Future Capabilities](docs/future-capabilities.md) | Roadmap covering active window adaptation, command mode, and screen context |
 | [Privacy](docs/privacy.md) | Exact details on memory handling, data isolation, and API security |
 | [Troubleshooting](docs/troubleshooting.md) | Solutions for hotkeys, audio devices, and local connections |
 
@@ -147,7 +157,7 @@ Comprehensive guides covering setup, tuning, and internal architecture:
 
 ---
 
-## Development & Testing
+## Development & Building
 
 ```cmd
 .\.venv\Scripts\pip install -r requirements-dev.txt
@@ -155,7 +165,10 @@ Comprehensive guides covering setup, tuning, and internal architecture:
 python benchmarks/engines.py
 ```
 
-The test suite covers the audio processing pipeline, streaming chunking logic, clipboard restoration safety, and cleanup fallbacks.
+To compile the standalone Windows executable and installer locally:
+```cmd
+build_installer.bat
+```
 
 ---
 
