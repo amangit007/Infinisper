@@ -4,7 +4,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 
 import litellm
 
-from multimodal.catalog import CURATED_PROVIDERS
+from cleanup.catalog import CURATED_PROVIDERS
 
 _PROVIDER_LABELS = dict(CURATED_PROVIDERS)
 _MAX_DETAIL_CHARS = 220

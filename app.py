@@ -22,14 +22,15 @@ from config import load_config, save_config
 from credentials import get_api_key, set_api_key
 from history.models import HistoryEntry
 from history.store import HistoryStore
-from multimodal import engine as multimodal_engine
+from cleanup import catalog as cleanup_catalog
+from cleanup import engine as cleanup_engine
 from timing import timed
-from ui.assets.mark import BRAND_ACCENT_DARK_HEX, mark_icon
+from ui.assets.mark import BRAND_HEX, mark_icon
 from ui.chip import ChipWindow
 from ui.main_window import MainWindow
 from ui.splash import SplashScreen
 from ui.tray import TrayIcon
-from utils.windows import set_app_user_model_id
+from utils.windows import HOTKEY_PRESETS, is_hotkey_pressed, set_app_user_model_id
 
 POLL_INTERVAL = 0.03
 MIN_AUDIO_SECONDS = 0.3
@@ -54,30 +55,35 @@ _model_size = "base"
 _input_device = None
 _qwen3_engine: qwen_asr.Qwen3AsrEngine | None = None
 _nemotron_engine: nemotron_asr.NemotronAsrEngine | None = None
+_nemotron_stream_session: nemotron_asr.NemotronStreamSession | None = None
 
 _use_asr = True
 _asr_engine = "whisper"  # "whisper" | "qwen3" | "nemotron" -- what's actually loaded and active
-_use_multimodal = False
-_multimodal_level = "basic"  # "basic" | "advanced"
-_multimodal_timeout_seconds = 60
+_use_cleanup = False
+_cleanup_level = "basic"  # "basic" | "advanced"
+_cleanup_timeout_seconds = 60
+_ollama_keep_alive: str | None = "30m"
 _fallback_to_whisper = True
-# Only applied when _use_multimodal is on -- see multimodal/prompts.py's
-# ENGLISH_TRANSLITERATION_RULE. Set from the Language tab, independently of the
+_hotkey = "ctrl+win"
+# Only applied when _use_cleanup is on -- see cleanup/prompts.py's
+# ENGLISH_TRANSLITERATION_RULE and translation_rule. Set from the Language tab.
 _force_english_transliteration = False
+_cleanup_output_mode = "original"  # "original" | "transliterate" | "translate"
+_translation_target_language = "en"
 _dictation_language = "en"
 # Names, acronyms and jargon the speaker uses that a general model mishears. Boosted
-# in Whisper's decoder via hotwords= and named to the multimodal model in its prompt.
+# in Whisper's decoder via hotwords= and named to the AI model in its prompt.
 # Qwen3 and Nemotron are not covered: sherpa-onnx can bias a transducer, but only with
 # a BPE model file that neither of those exports ships.
 _custom_words: list[str] = []
 
-# Runtime cache of config.json's multimodal_* fields -- app.py's own copy so the
+# Runtime cache of config.json's cleanup_* fields -- app.py's own copy so the
 # hotkey/dictation loop never touches disk on every take. Refreshed whenever the
-# Multimodal Models tab changes something (main_window.multimodal_changed) or the
+# Models & providers tab changes something (main_window.cleanup_changed) or the
 # Dashboard's Active model selection is saved.
-_multimodal_providers: list[dict] = []
-_multimodal_models: list[dict] = []
-_active_multimodal_model_id: str | None = None
+_cleanup_providers: list[dict] = []
+_cleanup_models: list[dict] = []
+_active_cleanup_model_id: str | None = None
 
 _history_store: HistoryStore | None = None
 
@@ -112,13 +118,31 @@ def is_busy() -> bool:
 
 
 def start_recording(chip: ChipWindow, tray: TrayIcon):
-    audio_capture.start_recording()
+    global _nemotron_stream_session
+    _nemotron_stream_session = None
+
+    preroll_chunks = audio_capture.start_recording()
     print("Listening...")
     chip.set_state("listening")
     tray.set_status("Listening...")
 
+    if _use_asr and _asr_engine == "nemotron" and _nemotron_engine is not None:
+        try:
+            session = _nemotron_engine.start_stream(
+                sample_rate=audio_capture.SAMPLE_RATE, language=_dictation_language
+            )
+            if preroll_chunks:
+                for chunk in preroll_chunks:
+                    session.feed_chunk(chunk)
+            audio_capture.set_chunk_listener(session.feed_chunk)
+            _nemotron_stream_session = session
+        except Exception as exc:
+            print(f"Failed to start Nemotron stream ({exc}), falling back to buffer.")
+            _nemotron_stream_session = None
+
 
 def stop_recording() -> np.ndarray | None:
+    audio_capture.clear_chunk_listener()
     return audio_capture.stop_recording()
 
 
@@ -147,6 +171,7 @@ def run_asr(audio: np.ndarray, steps: list | None = None) -> AsrOutcome:
     configured engine fails and fallback is enabled; otherwise reports a hard
     error and pastes nothing.
     """
+    global _nemotron_stream_session
     engine, label = None, None
     if _asr_engine == "qwen3" and _qwen3_engine is not None:
         engine, label = _qwen3_engine, "Qwen3"
@@ -155,11 +180,17 @@ def run_asr(audio: np.ndarray, steps: list | None = None) -> AsrOutcome:
 
     if engine is not None:
         try:
-            with timed(f"{label} transcribe", steps):
-                if label == "Nemotron":
-                    text = engine.transcribe(audio, audio_capture.SAMPLE_RATE, language=_dictation_language)
-                else:
-                    text = engine.transcribe(audio, audio_capture.SAMPLE_RATE)
+            if label == "Nemotron" and _nemotron_stream_session is not None:
+                session = _nemotron_stream_session
+                _nemotron_stream_session = None
+                with timed("Nemotron stream finalize", steps):
+                    text = session.finish()
+            else:
+                with timed(f"{label} transcribe", steps):
+                    if label == "Nemotron":
+                        text = engine.transcribe(audio, audio_capture.SAMPLE_RATE, language=_dictation_language)
+                    else:
+                        text = engine.transcribe(audio, audio_capture.SAMPLE_RATE)
         except Exception as exc:
             text = ""
             print(f"{label} failed ({exc}).")
@@ -177,21 +208,21 @@ def run_asr(audio: np.ndarray, steps: list | None = None) -> AsrOutcome:
     return AsrOutcome(_run_whisper(audio, steps), "Whisper")
 
 
-def _resolve_active_multimodal() -> tuple[str, str | None, str | None] | None:
-    """(model, api_key, base_url) for the configured active multimodal model,
+def _resolve_active_cleanup() -> tuple[str, str | None, str | None, bool] | None:
+    """(model, api_key, base_url, supports_audio) for the configured active AI model,
     or None if none is configured / the configured one no longer exists (its
-    provider or model could have been deleted on the Multimodal Models tab
+    provider or model could have been deleted on the Models & providers tab
     since this was set active).
     """
-    if not _active_multimodal_model_id:
+    if not _active_cleanup_model_id:
         return None
     model_entry = next(
-        (m for m in _multimodal_models if m["id"] == _active_multimodal_model_id), None
+        (m for m in _cleanup_models if m["id"] == _active_cleanup_model_id), None
     )
     if model_entry is None:
         return None
     provider_entry = next(
-        (p for p in _multimodal_providers if p["id"] == model_entry["provider_id"]), None
+        (p for p in _cleanup_providers if p["id"] == model_entry["provider_id"]), None
     )
     if provider_entry is None:
         return None
@@ -203,84 +234,127 @@ def _resolve_active_multimodal() -> tuple[str, str | None, str | None] | None:
     )
 
 
-def run_multimodal_on_audio(audio: np.ndarray, steps: list | None = None) -> AsrOutcome:
-    """Multimodal-only path: audio goes straight to the active multimodal
+def run_cleanup_on_audio(audio: np.ndarray, steps: list | None = None) -> AsrOutcome:
+    """Audio-direct path: audio goes straight to the active AI
     model, Whisper never runs unless it fails. Works with whichever provider
-    the Multimodal Models tab has configured as active -- not tied to any one
+    the Models & providers tab has configured as active -- not tied to any one
     AI provider. The .env GEMINI_API_KEY is only a last-resort fallback, for
     the rare case the migration on first run somehow didn't run.
     """
-    resolved = _resolve_active_multimodal()
-    if resolved is None and multimodal_engine.has_gemini_env_key():
-        resolved = (multimodal_engine.GEMINI_ENV_MODEL, multimodal_engine.get_gemini_env_key(), None, True)
+    resolved = _resolve_active_cleanup()
+    if resolved is None and cleanup_engine.has_gemini_env_key():
+        resolved = (cleanup_engine.GEMINI_ENV_MODEL, cleanup_engine.get_gemini_env_key(), None, True)
 
     if resolved is None:
-        print("No active multimodal model configured -- falling back to local Whisper.")
-        result = multimodal_engine.RefineResult("", used_multimodal=False, detail="no active model")
+        print("No active AI model configured -- falling back to local Whisper.")
+        result = cleanup_engine.RefineResult("", used_model=False, detail="no active model")
     else:
         model, api_key, base_url, supports_audio = resolved
         if not supports_audio:
             print(f"Active model '{model}' is text-only (does not support audio). Falling back to local Whisper.")
-            result = multimodal_engine.RefineResult(
-                "", used_multimodal=False, detail=f"'{model}' is text-only (does not support audio input)"
+            result = cleanup_engine.RefineResult(
+                "", used_model=False, detail=f"'{model}' is text-only (does not support audio input)"
             )
         else:
-            result = multimodal_engine.transcribe_with_multimodal_model(
+            result = cleanup_engine.transcribe_audio_with_model(
                 audio,
                 audio_capture.SAMPLE_RATE,
                 model=model,
                 api_key=api_key,
                 base_url=base_url,
-                level=_multimodal_level,
+                level=_cleanup_level,
                 force_english_transliteration=_force_english_transliteration,
-                timeout_seconds=_multimodal_timeout_seconds,
+                dictation_language=_dictation_language,
+                output_mode=_cleanup_output_mode,
+                target_language=_translation_target_language,
+                timeout_seconds=_cleanup_timeout_seconds,
                 steps=steps,
                 custom_words=_custom_words,
+                keep_alive=_ollama_keep_alive,
             )
 
-    if result.used_multimodal:
-        return AsrOutcome(result.text, "Multimodal")
+    if result.used_model:
+        return AsrOutcome(result.text, "AI audio")
 
     print(f"Falling back to local Whisper ({result.detail}).")
     if not _fallback_to_whisper:
         return AsrOutcome(
-            "", "", error=f"Multimodal model failed ({result.detail}) and fallback is disabled"
+            "", "", error=f"AI model failed ({result.detail}) and fallback is disabled"
         )
 
     return AsrOutcome(_run_whisper(audio, steps), "Whisper (fallback)")
 
 
-def run_multimodal_on_text(text: str, asr_source: str, steps: list | None = None) -> AsrOutcome:
+def run_cleanup_on_text(text: str, asr_source: str, steps: list | None = None) -> AsrOutcome:
     """Both-selected path: polish already-transcribed ASR text with the active
-    multimodal model. A cleanup failure is never fatal regardless of the
+    AI model. A cleanup failure is never fatal regardless of the
     fallback setting -- the ASR step already succeeded, so the unpolished text
     is simply kept.
     """
-    resolved = _resolve_active_multimodal()
-    if resolved is None and multimodal_engine.has_gemini_env_key():
-        resolved = (multimodal_engine.GEMINI_ENV_MODEL, multimodal_engine.get_gemini_env_key(), None, True)
+    resolved = _resolve_active_cleanup()
+    if resolved is None and cleanup_engine.has_gemini_env_key():
+        resolved = (cleanup_engine.GEMINI_ENV_MODEL, cleanup_engine.get_gemini_env_key(), None, True)
 
     if resolved is None:
-        print("No active multimodal model configured -- using unpolished ASR text.")
-        result = multimodal_engine.RefineResult(text, used_multimodal=False, detail="no active model")
+        print("No active AI model configured -- using unpolished ASR text.")
+        result = cleanup_engine.RefineResult(text, used_model=False, detail="no active model")
     else:
         model, api_key, base_url, _ = resolved
-        result = multimodal_engine.refine_text_with_multimodal_model(
+        result = cleanup_engine.refine_text_with_model(
             text,
             model=model,
             api_key=api_key,
             base_url=base_url,
-            level=_multimodal_level,
+            level=_cleanup_level,
             force_english_transliteration=_force_english_transliteration,
-            timeout_seconds=_multimodal_timeout_seconds,
+            dictation_language=_dictation_language,
+            output_mode=_cleanup_output_mode,
+            target_language=_translation_target_language,
+            timeout_seconds=_cleanup_timeout_seconds,
             steps=steps,
             custom_words=_custom_words,
+            keep_alive=_ollama_keep_alive,
         )
 
-    if result.used_multimodal:
-        return AsrOutcome(result.text, f"{asr_source} -> Multimodal")
-    print(f"Multimodal cleanup skipped ({result.detail}), using unpolished {asr_source} text.")
+    if result.used_model:
+        return AsrOutcome(result.text, f"{asr_source} -> AI cleanup")
+    print(f"AI cleanup skipped ({result.detail}), using unpolished {asr_source} text.")
     return AsrOutcome(text, asr_source)
+
+
+_last_warmed: tuple | None = None
+_WARM_AGAIN_AFTER_SECONDS = 600
+
+
+def _warm_active_ollama_model():
+    """Loads the active model into Ollama's memory in the background, so the first dictation
+    isn't the one that pays for it -- a cold gemma4:e4b took ~10 s where a loaded one takes
+    ~1 s. Only for a local Ollama model, only when AI cleanup is on, and never when the user
+    left keep-alive at Ollama's own default. Quiet if Ollama isn't running: this is a
+    convenience, and the app never starts Ollama or downloads anything on the user's behalf.
+    """
+    global _last_warmed
+    if not (_use_cleanup and _ollama_keep_alive):
+        return
+    resolved = _resolve_active_cleanup()
+    if resolved is None:
+        return
+    model, _key, base_url, _supports_audio = resolved
+    if not model.startswith("ollama/") or not cleanup_catalog.is_local_endpoint(model, base_url):
+        return
+
+    signature = (model, base_url, _ollama_keep_alive)
+    if _last_warmed and _last_warmed[0] == signature and time.monotonic() - _last_warmed[1] < _WARM_AGAIN_AFTER_SECONDS:
+        return
+    _last_warmed = (signature, time.monotonic())
+
+    def work():
+        started = time.perf_counter()
+        if cleanup_engine.warm_up_ollama(model, base_url, _ollama_keep_alive):
+            print(f"Loaded {model} into Ollama ({time.perf_counter() - started:.1f} s); "
+                  f"keeping it for {_ollama_keep_alive}.")
+
+    threading.Thread(target=work, daemon=True).start()
 
 
 def _log_history(outcome: str, engine: str, text: str, error: str, pipeline_start: float, steps: list):
@@ -308,13 +382,16 @@ def _has_speech(audio: np.ndarray) -> bool:
 def transcribe_and_paste(
     chip: ChipWindow, tray: TrayIcon, audio: np.ndarray, hold_duration: float
 ):
-    global _transcribing
+    global _transcribing, _nemotron_stream_session
 
     pipeline_start = time.perf_counter()
     steps: list[tuple[str, float]] = []
 
     if hold_duration < MIN_HOLD_SECONDS:
         print("Too quick, ignoring.")
+        if _nemotron_stream_session is not None:
+            _nemotron_stream_session.abort()
+            _nemotron_stream_session = None
         chip.set_state("nospeech")
         tray.set_status("Ready")
         _log_history("skipped_quick", "", "", "", pipeline_start, [])
@@ -322,6 +399,9 @@ def transcribe_and_paste(
 
     if len(audio) < audio_capture.SAMPLE_RATE * MIN_AUDIO_SECONDS:
         print("Too short, ignoring.")
+        if _nemotron_stream_session is not None:
+            _nemotron_stream_session.abort()
+            _nemotron_stream_session = None
         chip.set_state("nospeech")
         tray.set_status("Ready")
         _log_history("skipped_short", "", "", "", pipeline_start, [])
@@ -329,28 +409,13 @@ def transcribe_and_paste(
 
     if not _has_speech(audio):
         print("Silence, ignoring.")
+        if _nemotron_stream_session is not None:
+            _nemotron_stream_session.abort()
+            _nemotron_stream_session = None
         chip.set_state("nospeech")
         tray.set_status("Ready")
         _log_history("skipped_silence", "", "", "", pipeline_start, [])
         return
-
-    # Remove DC bias, filter desk rumble, and notch out the hotkey click -- which sits
-    # at the pre-roll boundary, so capture has to say how much pre-roll this take
-    # actually got (less than the nominal 0.5s on the first take after launch).
-    audio = audio_preprocessor.clean_speech_audio(
-        audio,
-        audio_capture.SAMPLE_RATE,
-        click_at_seconds=audio_capture.preroll_seconds_used(),
-    )
-    # Trim to speech before normalising, so the level is measured over speech rather
-    # than over speech plus the silence around it.
-    with timed("VAD trim", steps):
-        audio = audio_vad.trim_to_speech(audio, audio_capture.SAMPLE_RATE)
-    audio = audio_preprocessor.normalize_audio(audio)
-
-    print("Transcribing...")
-    chip.set_state("transcribing")
-    tray.set_status("Transcribing...")
     with _transcribing_lock:
         _transcribing = True
 
@@ -360,12 +425,29 @@ def transcribe_and_paste(
     result_text = ""
     error_text = ""
     try:
-        if not _use_asr and not _use_multimodal:
+        # Remove DC bias, filter desk rumble, and notch out the hotkey click -- which sits
+        # at the pre-roll boundary, so capture has to say how much pre-roll this take
+        # actually got (less than the nominal 0.5s on the first take after launch).
+        audio = audio_preprocessor.clean_speech_audio(
+            audio,
+            audio_capture.SAMPLE_RATE,
+            click_at_seconds=audio_capture.preroll_seconds_used(),
+        )
+        # Trim to speech before normalising, so the level is measured over speech rather
+        # than over speech plus the silence around it.
+        with timed("VAD trim", steps):
+            audio = audio_vad.trim_to_speech(audio, audio_capture.SAMPLE_RATE)
+        audio = audio_preprocessor.normalize_audio(audio)
+
+        print("Transcribing...")
+        chip.set_state("transcribing")
+        tray.set_status("Transcribing...")
+        if not _use_asr and not _use_cleanup:
             # Defensive only -- the settings UI itself blocks saving this combination.
             print("No transcription engine enabled (check config.json) -- using Whisper.")
             outcome = run_asr(audio, steps)
 
-        elif _use_asr and _use_multimodal:
+        elif _use_asr and _use_cleanup:
             outcome = run_asr(audio, steps)
             if outcome.error:
                 print(outcome.error)
@@ -377,12 +459,12 @@ def transcribe_and_paste(
                 outcome_label = "skipped_silence"
                 return
             chip.set_state("polishing")
-            tray.set_status("Cleaning up with the multimodal model...")
-            outcome = run_multimodal_on_text(outcome.text, outcome.source, steps)
+            tray.set_status("Cleaning up with the AI model...")
+            outcome = run_cleanup_on_text(outcome.text, outcome.source, steps)
 
-        elif _use_multimodal:
-            tray.set_status("Transcribing with the multimodal model...")
-            outcome = run_multimodal_on_audio(audio, steps)
+        elif _use_cleanup:
+            tray.set_status("Transcribing with the AI model...")
+            outcome = run_cleanup_on_audio(audio, steps)
             if outcome.error:
                 print(outcome.error)
                 final_status = f"Error -- {outcome.error}"
@@ -409,6 +491,12 @@ def transcribe_and_paste(
         engine_label = outcome.source
         result_text = outcome.text
     finally:
+        if _nemotron_stream_session is not None:
+            try:
+                _nemotron_stream_session.abort()
+            except Exception:
+                pass
+            _nemotron_stream_session = None
         elapsed_ms = (time.perf_counter() - pipeline_start) * 1000
         print(f"[timing] TOTAL (transcribe + refine + paste): {elapsed_ms:.0f}ms")
         with _transcribing_lock:
@@ -422,6 +510,7 @@ def transcribe_and_paste(
 # contents are put back. Generous on purpose: the restore no longer blocks the
 # pipeline, so there is nothing to gain by racing it. See _restore_clipboard_later.
 CLIPBOARD_RESTORE_SECONDS = 1.5
+_clipboard_lock = threading.Lock()
 
 
 def _restore_clipboard_later(previous: str, pasted: str):
@@ -442,8 +531,9 @@ def _restore_clipboard_later(previous: str, pasted: str):
     def worker():
         time.sleep(CLIPBOARD_RESTORE_SECONDS)
         try:
-            if pyperclip.paste() == pasted:
-                pyperclip.copy(previous)
+            with _clipboard_lock:
+                if pyperclip.paste() == pasted:
+                    pyperclip.copy(previous)
         except Exception:
             pass
 
@@ -453,11 +543,13 @@ def _restore_clipboard_later(previous: str, pasted: str):
 def paste_text(text: str, steps: list | None = None):
     with timed("Paste (clipboard swap + send)", steps):
         try:
-            previous_clipboard = pyperclip.paste()
+            with _clipboard_lock:
+                previous_clipboard = pyperclip.paste()
         except Exception:
             previous_clipboard = None
 
-        pyperclip.copy(text)
+        with _clipboard_lock:
+            pyperclip.copy(text)
         keyboard.send("ctrl+v")
 
     if previous_clipboard is not None:
@@ -465,14 +557,15 @@ def paste_text(text: str, steps: list | None = None):
 
 
 def hotkey_loop(chip: ChipWindow, tray: TrayIcon, quit_signal: _QuitSignal):
+    global _nemotron_stream_session
     combo_active = False
     hold_started_at = 0.0
 
     while True:
         try:
-            pressed = keyboard.is_pressed("ctrl") and keyboard.is_pressed("windows")
+            pressed = is_hotkey_pressed(_hotkey)
 
-            if pressed and not combo_active and not _paused:
+            if pressed and not combo_active and not _paused and not is_busy():
                 combo_active = True
                 hold_started_at = time.monotonic()
                 start_recording(chip, tray)
@@ -486,12 +579,22 @@ def hotkey_loop(chip: ChipWindow, tray: TrayIcon, quit_signal: _QuitSignal):
                     chip.set_state("nospeech")
                     tray.set_status("Ready")
                 else:
-                    transcribe_and_paste(chip, tray, audio, hold_duration)
+                    threading.Thread(
+                        target=transcribe_and_paste,
+                        args=(chip, tray, audio, hold_duration),
+                        daemon=True,
+                    ).start()
 
         except Exception:
             print("Unexpected error, recovering:")
             traceback.print_exc()
             combo_active = False
+            if _nemotron_stream_session is not None:
+                try:
+                    _nemotron_stream_session.abort()
+                except Exception:
+                    pass
+                _nemotron_stream_session = None
             stop_recording()
             chip.set_state("failed")
             tray.set_status("Ready")
@@ -702,8 +805,8 @@ def set_whisper_model_size(new_model_size: str, tray: TrayIcon):
 
 def apply_settings(new_config: dict, tray: TrayIcon, main_window):
     global _model, _model_size, _input_device, _stream
-    global _use_asr, _asr_engine, _use_multimodal, _multimodal_level, _fallback_to_whisper
-    global _active_multimodal_model_id, _multimodal_timeout_seconds
+    global _use_asr, _asr_engine, _use_cleanup, _cleanup_level, _fallback_to_whisper
+    global _active_cleanup_model_id, _cleanup_timeout_seconds, _hotkey, _ollama_keep_alive
 
     if is_busy():
         print("Still dictating -- try again in a moment.")
@@ -718,8 +821,8 @@ def apply_settings(new_config: dict, tray: TrayIcon, main_window):
         new_device = _input_device
 
     # Merge into the existing saved config rather than overwriting it outright --
-    # config.json also holds multimodal_providers/multimodal_models (managed by
-    # the Multimodal Models tab), which this dialog knows nothing about and
+    # config.json also holds cleanup_providers/cleanup_models (managed by
+    # the Models & providers tab), which this dialog knows nothing about and
     # must not wipe out.
     persisted_config = load_config()
     persisted_config.update(
@@ -728,21 +831,26 @@ def apply_settings(new_config: dict, tray: TrayIcon, main_window):
             "input_device": new_device,
             "use_asr": new_config["use_asr"],
             "asr_engine": new_asr_engine,
-            "use_multimodal": new_config["use_multimodal"],
-            "multimodal_level": new_config["multimodal_level"],
-            "multimodal_timeout_seconds": new_config["multimodal_timeout_seconds"],
+            "use_cleanup": new_config["use_cleanup"],
+            "cleanup_level": new_config["cleanup_level"],
+            "cleanup_timeout_seconds": new_config["cleanup_timeout_seconds"],
             "fallback_to_whisper": new_config["fallback_to_whisper"],
-            "active_multimodal_model_id": new_config["active_multimodal_model_id"],
+            "active_cleanup_model_id": new_config["active_cleanup_model_id"],
+            "hotkey": new_config.get("hotkey", "ctrl+win"),
+            "ollama_keep_alive": new_config.get("ollama_keep_alive", _ollama_keep_alive),
         }
     )
     save_config(persisted_config)
 
     _use_asr = new_config["use_asr"]
-    _use_multimodal = new_config["use_multimodal"]
-    _multimodal_level = new_config["multimodal_level"]
-    _multimodal_timeout_seconds = new_config["multimodal_timeout_seconds"]
+    _use_cleanup = new_config["use_cleanup"]
+    _cleanup_level = new_config["cleanup_level"]
+    _cleanup_timeout_seconds = new_config["cleanup_timeout_seconds"]
     _fallback_to_whisper = new_config["fallback_to_whisper"]
-    _active_multimodal_model_id = new_config["active_multimodal_model_id"]
+    _active_cleanup_model_id = new_config["active_cleanup_model_id"]
+    _hotkey = new_config.get("hotkey", "ctrl+win")
+    _ollama_keep_alive = new_config.get("ollama_keep_alive", _ollama_keep_alive)
+    _warm_active_ollama_model()
 
     if new_model_size != _model_size:
         print(f"Loading {new_model_size} model...")
@@ -787,11 +895,30 @@ def apply_settings(new_config: dict, tray: TrayIcon, main_window):
 
 
 def apply_language_settings(force_english_transliteration: bool):
-    global _force_english_transliteration
+    global _force_english_transliteration, _cleanup_output_mode
     persisted_config = load_config()
     persisted_config["force_english_transliteration"] = force_english_transliteration
+    if force_english_transliteration:
+        persisted_config["cleanup_output_mode"] = "transliterate"
+        _cleanup_output_mode = "transliterate"
+    elif persisted_config.get("cleanup_output_mode") == "transliterate":
+        persisted_config["cleanup_output_mode"] = "original"
+        _cleanup_output_mode = "original"
     save_config(persisted_config)
     _force_english_transliteration = force_english_transliteration
+
+
+def apply_cleanup_transformation(output_mode: str, target_language: str):
+    global _cleanup_output_mode, _translation_target_language, _force_english_transliteration
+    persisted_config = load_config()
+    persisted_config["cleanup_output_mode"] = output_mode
+    persisted_config["translation_target_language"] = target_language
+    persisted_config["force_english_transliteration"] = (output_mode == "transliterate")
+    save_config(persisted_config)
+    _cleanup_output_mode = output_mode
+    _translation_target_language = target_language
+    _force_english_transliteration = (output_mode == "transliterate")
+    print(f"Cleanup transformation set to: {output_mode} (target: {target_language})")
 
 
 def apply_custom_words(custom_words: list[str]):
@@ -813,36 +940,37 @@ def apply_dictation_language(dictation_language: str):
 
 
 def _migrate_env_gemini_key_if_needed(config: dict) -> dict:
-    """First-run only: if no providers are configured yet but a working
+    """First-run only: if no models are configured yet but a working
     GEMINI_API_KEY already exists in .env, turn it into a real provider+model
     pair so existing users see zero regression -- their already-working setup
-    keeps working through the new Multimodal Models system instead of quietly
+    keeps working through the AI providers system instead of quietly
     depending on a hidden .env-only code path forever.
     """
-    if config["multimodal_providers"] or not multimodal_engine.has_gemini_env_key():
+    if config["cleanup_models"] or not cleanup_engine.has_gemini_env_key():
         return config
 
     provider_id = "gemini"
-    set_api_key(provider_id, multimodal_engine.get_gemini_env_key())
-    model_id = f"{provider_id}::{multimodal_engine.GEMINI_ENV_MODEL}"
+    set_api_key(provider_id, cleanup_engine.get_gemini_env_key())
+    model_id = f"{provider_id}::{cleanup_engine.GEMINI_ENV_MODEL}"
 
-    config["multimodal_providers"] = [
+    # Kept alongside the pre-configured Ollama provider, not replacing it.
+    config["cleanup_providers"] = [p for p in config["cleanup_providers"] if p["id"] != provider_id] + [
         {"id": provider_id, "display_name": "Google Gemini", "base_url": None}
     ]
-    config["multimodal_models"] = [
+    config["cleanup_models"] = [
         {
             "id": model_id,
             "provider_id": provider_id,
-            "model": multimodal_engine.GEMINI_ENV_MODEL,
+            "model": cleanup_engine.GEMINI_ENV_MODEL,
             "display_name": "Gemini 3.5 Flash Lite",
             "supports_audio": True,
             "last_tested": None,
             "test_passed": True,  # proven working by this app's own extensive prior use, not re-tested
         }
     ]
-    config["active_multimodal_model_id"] = model_id
+    config["active_cleanup_model_id"] = model_id
     save_config(config)
-    print("Migrated your .env GEMINI_API_KEY into a Multimodal Models provider.")
+    print("Migrated your .env GEMINI_API_KEY into an AI provider.")
     return config
 
 
@@ -850,11 +978,12 @@ def main():
     set_app_user_model_id()
 
     global _model, _model_size, _input_device, _stream
-    global _use_asr, _asr_engine, _use_multimodal, _multimodal_level, _fallback_to_whisper
+    global _use_asr, _asr_engine, _use_cleanup, _cleanup_level, _fallback_to_whisper
     global _qwen3_engine, _nemotron_engine, _history_store
-    global _multimodal_providers, _multimodal_models, _active_multimodal_model_id
-    global _multimodal_timeout_seconds, _force_english_transliteration, _dictation_language
-    global _custom_words
+    global _cleanup_providers, _cleanup_models, _active_cleanup_model_id
+    global _cleanup_timeout_seconds, _force_english_transliteration, _dictation_language
+    global _cleanup_output_mode, _translation_target_language
+    global _custom_words, _ollama_keep_alive
 
     config = load_config()
     config = _migrate_env_gemini_key_if_needed(config)
@@ -862,14 +991,18 @@ def main():
     _input_device = config["input_device"]
     _use_asr = config["use_asr"]
     _asr_engine = config["asr_engine"]
-    _use_multimodal = config["use_multimodal"]
-    _multimodal_level = config["multimodal_level"]
-    _multimodal_timeout_seconds = config["multimodal_timeout_seconds"]
+    _use_cleanup = config["use_cleanup"]
+    _cleanup_level = config["cleanup_level"]
+    _cleanup_timeout_seconds = config["cleanup_timeout_seconds"]
     _fallback_to_whisper = config["fallback_to_whisper"]
-    _multimodal_providers = config["multimodal_providers"]
-    _multimodal_models = config["multimodal_models"]
-    _active_multimodal_model_id = config["active_multimodal_model_id"]
+    _cleanup_providers = config["cleanup_providers"]
+    _cleanup_models = config["cleanup_models"]
+    _active_cleanup_model_id = config["active_cleanup_model_id"]
+    _hotkey = config.get("hotkey", "ctrl+win")
+    _ollama_keep_alive = config.get("ollama_keep_alive", "30m")
     _force_english_transliteration = config["force_english_transliteration"]
+    _cleanup_output_mode = config.get("cleanup_output_mode", "original")
+    _translation_target_language = config.get("translation_target_language", "en")
     _dictation_language = config.get("dictation_language", "en")
     _custom_words = [w.strip() for w in config.get("custom_words", []) if str(w).strip()]
     if _custom_words:
@@ -881,7 +1014,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # closing the main window must not quit the app
-    app.setWindowIcon(mark_icon(BRAND_ACCENT_DARK_HEX))
+    app.setWindowIcon(mark_icon(BRAND_HEX))
 
     from utils.single_instance import SingleInstance
     single_instance = SingleInstance()
@@ -916,19 +1049,24 @@ def main():
         "input_device": _input_device,
         "use_asr": _use_asr,
         "asr_engine": _asr_engine,
-        "use_multimodal": _use_multimodal,
-        "multimodal_level": _multimodal_level,
-        "multimodal_timeout_seconds": _multimodal_timeout_seconds,
+        "use_cleanup": _use_cleanup,
+        "cleanup_level": _cleanup_level,
+        "cleanup_timeout_seconds": _cleanup_timeout_seconds,
         "fallback_to_whisper": _fallback_to_whisper,
-        "multimodal_models": _multimodal_models,
-        "active_multimodal_model_id": _active_multimodal_model_id,
+        "cleanup_models": _cleanup_models,
+        "active_cleanup_model_id": _active_cleanup_model_id,
         "force_english_transliteration": _force_english_transliteration,
+        "cleanup_output_mode": _cleanup_output_mode,
+        "translation_target_language": _translation_target_language,
         "dictation_language": _dictation_language,
         "custom_words": _custom_words,
+        "hotkey": _hotkey,
+        "ollama_keep_alive": _ollama_keep_alive,
     }
     main_window = MainWindow(current_config, _history_store)
     main_window.settings_saved.connect(lambda cfg: apply_settings(cfg, tray, main_window))
     main_window.language_settings_changed.connect(apply_language_settings)
+    main_window.cleanup_transformation_changed.connect(apply_cleanup_transformation)
     main_window.dictation_language_changed.connect(apply_dictation_language)
     main_window.custom_words_changed.connect(apply_custom_words)
     main_window.delete_model_requested.connect(
@@ -941,21 +1079,22 @@ def main():
         lambda size: set_whisper_model_size(size, tray)
     )
 
-    def on_multimodal_changed():
-        # The Multimodal Models tab can itself null out active_multimodal_model_id
+    def on_cleanup_changed():
+        # The Models & providers tab can itself null out active_cleanup_model_id
         # (deleting the provider/model backing it), so re-read that too, not just
         # the provider/model lists -- otherwise app.py's cache would keep pointing
         # at a model that no longer exists.
-        global _multimodal_providers, _multimodal_models, _active_multimodal_model_id
+        global _cleanup_providers, _cleanup_models, _active_cleanup_model_id
         fresh_config = load_config()
-        _multimodal_providers = fresh_config["multimodal_providers"]
-        _multimodal_models = fresh_config["multimodal_models"]
-        _active_multimodal_model_id = fresh_config["active_multimodal_model_id"]
-        main_window.dashboard_tab.refresh_multimodal_models(
-            _multimodal_models, _active_multimodal_model_id
+        _cleanup_providers = fresh_config["cleanup_providers"]
+        _cleanup_models = fresh_config["cleanup_models"]
+        _active_cleanup_model_id = fresh_config["active_cleanup_model_id"]
+        main_window.dashboard_tab.refresh_cleanup_models(
+            _cleanup_models, _active_cleanup_model_id
         )
+        _warm_active_ollama_model()
 
-    main_window.multimodal_changed.connect(on_multimodal_changed)
+    main_window.cleanup_changed.connect(on_cleanup_changed)
 
     audio_capture.set_chip(_LevelFanout(chip, main_window.sidebar))
     chip.state_changed.connect(
@@ -1012,13 +1151,15 @@ def main():
 
     main_window.refresh_engine_statuses(_asr_engine, busy=False)
 
-    splash.set_step("Ready -- hold Ctrl+Win and speak", total_steps, total_steps)
+    hotkey_name = HOTKEY_PRESETS.get(_hotkey, {}).get("display", "Ctrl + Win")
+    splash.set_step(f"Ready -- hold {hotkey_name} and speak", total_steps, total_steps)
     splash.close()
 
     # The whole point of this change is to move the app out of the terminal --
     # the main window is the primary surface, shown by default rather than
     # hidden behind a tray click.
     main_window.show()
+    _warm_active_ollama_model()
 
     print("Model loaded. Hold Ctrl+Win to dictate, release to transcribe and paste.")
     print("Right-click the tray icon to open the window, Pause, or Quit. Esc also quits.")

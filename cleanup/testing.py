@@ -5,9 +5,9 @@ from dataclasses import dataclass
 import litellm
 import numpy as np
 
-from multimodal.catalog import get_model_capabilities
-from multimodal.engine import TIMEOUT_SECONDS, audio_to_wav_base64, completion_kwargs
-from multimodal.errors import describe_error
+from cleanup.catalog import get_model_capabilities
+from cleanup.engine import TIMEOUT_SECONDS, audio_to_wav_base64, completion_kwargs
+from cleanup.errors import describe_error
 
 _executor = ThreadPoolExecutor(max_workers=2)
 
@@ -96,7 +96,7 @@ def _probe(label: str, messages: list, model: str, api_key: str | None, base_url
             # every mapped exception, but never the actual descriptive message -- that
             # only lives in the exception object, so print the raw form here for
             # debugging. What goes back to the dialog is describe_error's one sentence.
-            print(f"Multimodal provider test ({label} call) failed: {exc}")
+            print(f"AI provider test ({label} call) failed: {exc}")
             if _is_blocked(exc):
                 return CALL_BLOCKED, describe_error(exc)
             if not _is_transient(exc):
@@ -164,8 +164,8 @@ def test_provider_model(
 ) -> TestResult:
     """Runs a minimal text call and a minimal audio call against `model`.
     A model that rejects audio entirely still gets `passed=True` (text_ok) so
-    the caller can offer saving it as a text-only multimodal model -- usable at
-    least for the ASR+Multimodal cleanup path, which is text-only anyway --
+    the caller can offer saving it as a text-only AI model -- usable at
+    least for the ASR+AI cleanup path, which is text-only anyway --
     rather than hard-blocking the save.
     """
     actual_model = model

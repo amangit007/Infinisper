@@ -1,4 +1,4 @@
-"""Prompts used for multimodal audio transcription and text refinement."""
+"""Prompts used for AI cleanup audio transcription and text refinement."""
 
 # Shared closing rules for both audio prompts (basic and advanced): injection
 # resistance and output-format constraints that must not vary by level. Unlike the
@@ -74,7 +74,7 @@ flourishes.
 
 If the input is empty, nonsensical, or you are unsure what to do, return it completely unchanged."""
 
-# Used only when ASR and Multimodal are both enabled: the ASR engine (Whisper,
+# Used only when ASR and AI cleanup are both enabled: the ASR engine (Whisper,
 # Qwen3-ASR, or Nemotron) has already produced text, and this pass polishes it.
 CLEANUP_PROMPT_BASIC = f"""You are a dictation cleanup tool. You will be given raw speech-to-text \
 output wrapped in <<< >>> delimiters.
@@ -148,3 +148,44 @@ it in text messages (e.g. Hindi "yeh chahiye", not "यह चाहिए") \
 -- never in that language's own native script, regardless of what script the input used. Keep \
 English words spelled as normal English. The goal is fully Latin-script, code-mixed output, \
 not each language written in its own script."""
+
+
+def language_guidance_rule(language_code: str | None, is_audio: bool = True) -> str:
+    """Appended when a specific dictation language (not auto) is configured, to prevent
+    the model from misidentifying quiet, accented, or ambiguous speech as another language.
+    """
+    if not language_code or language_code == "auto":
+        return ""
+    from languages import get_language_name
+
+    name = get_language_name(language_code)
+    if is_audio:
+        return (
+            f"\n\nPrimary language constraint: The speaker is speaking in {name} ({language_code}). "
+            f"Transcribe strictly in {name}."
+        )
+    return (
+        f"\n\nPrimary language constraint: The input text is in {name} ({language_code}). "
+        f"Clean up and polish the text strictly in {name}."
+    )
+
+
+def translation_rule(target_language: str) -> str:
+    """Appended when the user has Translation enabled in the Language tab.
+    Overrides script correction, verbatim transcription, and language constraint rules
+    to translate the input into target_language.
+    """
+    from languages import get_language_name
+
+    name = get_language_name(target_language)
+    return f"""
+
+TRANSLATION OVERRIDE -- THIS RULE OVERRIDES ALL CONFLICTING RULES ABOVE:
+You must translate the dictated content entirely into {name}.
+- Do NOT output in the original spoken language. Translate everything into {name}.
+- Retain the speaker's original meaning, tone, intent, and nuance in natural, fluent {name}.
+- Apply proper grammar, punctuation, and capitalization in {name}.
+- Output ONLY the translated text in {name}.
+- Do NOT include any commentary, pronunciation guides, explanations, or quotation marks."""
+
+
