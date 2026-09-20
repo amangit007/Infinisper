@@ -8,6 +8,8 @@ datas = [
     ('assets', 'assets'),
 ]
 datas += collect_data_files('sherpa_onnx')
+datas += collect_data_files('faster_whisper')
+datas += collect_data_files('huggingface_hub')
 datas += collect_data_files('litellm')
 datas += collect_data_files('tiktoken')
 datas += collect_data_files('tiktoken_ext')
@@ -37,6 +39,8 @@ hiddenimports = [
     'tiktoken_ext.openai_public',
 ]
 hiddenimports += collect_submodules('keyring')
+hiddenimports += collect_submodules('faster_whisper')
+hiddenimports += collect_submodules('huggingface_hub')
 hiddenimports += collect_submodules('dictation')
 hiddenimports += collect_submodules('asr')
 hiddenimports += collect_submodules('audio')

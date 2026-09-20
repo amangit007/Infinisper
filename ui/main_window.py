@@ -170,6 +170,7 @@ class _ResizableContainer(QWidget):
 class MainWindow(QMainWindow):
     settings_saved = Signal(dict)
     delete_model_requested = Signal(str)
+    download_model_requested = Signal(str)
     cleanup_changed = Signal()
     activate_engine_requested = Signal(str)
     whisper_model_size_changed = Signal(str)
@@ -243,12 +244,14 @@ class MainWindow(QMainWindow):
         self.dashboard_tab.settings_saved.connect(self.settings_saved.emit)
         self.dashboard_tab.settings_saved.connect(self._on_settings_saved)
         self.dashboard_tab.delete_model_requested.connect(self.delete_model_requested.emit)
+        self.dashboard_tab.download_model_requested.connect(self.download_model_requested.emit)
         self.dashboard_tab.manage_models_requested.connect(lambda: self._on_nav_requested("models"))
         self._stack.addWidget(self.dashboard_tab)
 
         self.models_tab = ModelsTab()
         self.models_tab.changed.connect(self.cleanup_changed.emit)
         self.models_tab.activate_engine_requested.connect(self.activate_engine_requested.emit)
+        self.models_tab.download_requested.connect(self.download_model_requested.emit)
         self.models_tab.delete_engine_requested.connect(self.delete_model_requested.emit)
         self.models_tab.whisper_model_size_changed.connect(self.whisper_model_size_changed.emit)
         self._stack.addWidget(self.models_tab)

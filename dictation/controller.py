@@ -44,6 +44,33 @@ class SettingsController:
         self._prep_lock = threading.Lock()
         self._prepping = False
 
+    def on_download_finished(self, model_id: str, success: bool, error: str):
+        if success:
+            print(f"Download complete: {model_id}")
+            if model_id.startswith("whisper-"):
+                size = model_id.removeprefix("whisper-")
+                if self.runtime.whisper is None or self.runtime.active_engine == "whisper":
+                    self._load_whisper_async(size)
+            elif model_id in _ENGINES:
+                if self.runtime.active_engine == model_id:
+                    self._prepare_async(model_id)
+            self.tray.set_status("Ready")
+        else:
+            print(f"Download failed for {model_id}: {error}")
+            self.tray.set_status(f"Download failed: {error}")
+
+        self.main_window.refresh_engine_statuses(self.runtime.active_engine or "", busy=False)
+
+    def start_model_download(self, model_id: str):
+        if self.pipeline.is_busy():
+            print("Still dictating -- try downloading again in a moment.")
+            return
+        print(f"Starting download for {model_id}...")
+        self.tray.set_status(f"Downloading {model_id}...")
+        from asr.downloader import get_downloader
+        get_downloader().start_download(model_id)
+        self.main_window.refresh_engine_statuses(self.runtime.active_engine or "", busy=False)
+
     # ---- speech engines --------------------------------------------------------------
 
     def _switch_to(self, engine_id: str):
@@ -56,7 +83,10 @@ class SettingsController:
             self.main_window.refresh_engine_statuses("whisper", busy=self.pipeline.is_busy())
             return
 
-        spec = _ENGINES[engine_id]
+        spec = _ENGINES.get(engine_id)
+        if not spec:
+            return
+
         if getattr(rt, spec.attribute) is not None:
             rt.active_engine = engine_id
             self.tray.set_status(f"Ready ({spec.short_name})")
@@ -107,19 +137,52 @@ class SettingsController:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _load_whisper_async(self, size: str):
+        """Loads Whisper variant on a background thread to prevent freezing the GUI."""
+        rt = self.runtime
+        self.tray.set_status(f"Loading Whisper {size}...")
+        self.main_window.refresh_engine_statuses(rt.active_engine or "whisper", busy=True)
+
+        def worker():
+            try:
+                model_path = asr_catalog.get_whisper_model_path(size)
+                print(f"Loading Whisper {size} from {model_path}...")
+                model = WhisperModel(model_path, device="cpu", compute_type="int8")
+                rt.whisper = model
+                rt.whisper_size = size
+                rt.active_engine = "whisper"
+                persisted_config = load_config()
+                persisted_config["model_size"] = size
+                persisted_config["asr_engine"] = "whisper"
+                save_config(persisted_config)
+                print(f"Whisper {size} loaded.")
+                self.tray.set_status("Ready")
+            except Exception as exc:
+                print(f"Failed to load Whisper {size} ({exc}).")
+                self.tray.set_status("Whisper load failed")
+            finally:
+                self.main_window.engine_status_refresh_requested.emit(
+                    rt.active_engine or "whisper", self.pipeline.is_busy()
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def delete_model(self, engine_id: str):
-        """Permanently deletes a downloaded ASR engine's weights, after a
-        confirmation dialog naming the exact size/path. Refused only while the
-        app is busy dictating -- deleting the currently active engine is allowed;
-        since Whisper itself can never be deleted, it's always safe to fall back
-        to as the new active engine.
-        """
+        """Permanently deletes a downloaded ASR model's weights after confirmation."""
         rt = self.runtime
         if self.pipeline.is_busy():
             print("Still dictating -- try deleting the model again in a moment.")
             return
 
-        was_active = engine_id == rt.active_engine
+        was_active = False
+        if engine_id.startswith("whisper-"):
+            size = engine_id.removeprefix("whisper-")
+            was_active = (rt.active_engine == "whisper" and rt.whisper_size == size)
+        elif engine_id == "whisper":
+            was_active = (rt.active_engine == "whisper")
+        else:
+            was_active = (engine_id == rt.active_engine)
+
         if not self.main_window.models_tab.confirm_and_request_delete_engine(engine_id, was_active):
             return
 
@@ -132,6 +195,10 @@ class SettingsController:
 
         if engine_id in _ENGINES:
             setattr(rt, _ENGINES[engine_id].attribute, None)
+        elif engine_id.startswith("whisper-"):
+            size = engine_id.removeprefix("whisper-")
+            if rt.whisper_size == size:
+                rt.whisper = None
 
         if was_active:
             rt.active_engine = "whisper"
@@ -143,53 +210,62 @@ class SettingsController:
 
         self.main_window.refresh_engine_statuses(rt.active_engine, busy=False)
 
-    def activate_asr_engine(self, engine_id: str):
-        """Immediate engine switch triggered from the Models & providers table's
-        Activate button -- unlike Dashboard's Save, this doesn't wait for the rest
-        of the settings form. Engine switches can still trigger a real download, so
-        qwen3/nemotron go through the same background load Dashboard's Save uses; only
-        whisper (always available) switches synchronously.
-        """
+    def activate_asr_engine(self, engine_or_model_id: str):
+        """Immediate engine or model variant switch triggered from the UI."""
         if self.pipeline.is_busy():
             print("Still dictating -- try activating a different engine again in a moment.")
             return
-        if engine_id == self.runtime.active_engine:
+
+        rt = self.runtime
+
+        # Handle whisper variant (e.g. 'whisper-base')
+        if engine_or_model_id.startswith("whisper-"):
+            size = engine_or_model_id.removeprefix("whisper-")
+            if rt.active_engine == "whisper" and rt.whisper_size == size:
+                return
+            if not asr_catalog.is_downloaded(engine_or_model_id):
+                print(f"{engine_or_model_id} not downloaded, starting download...")
+                self.start_model_download(engine_or_model_id)
+                return
+            persisted_config = load_config()
+            persisted_config["asr_engine"] = "whisper"
+            persisted_config["model_size"] = size
+            save_config(persisted_config)
+            self.main_window.dashboard_tab.set_active_engine_radio("whisper")
+            rt.active_engine = "whisper"
+            self.set_whisper_model_size(size)
             return
-        if engine_id != "whisper" and engine_id not in _ENGINES:
-            print(f"Unknown speech engine '{engine_id}', ignoring.")
+
+        if engine_or_model_id == rt.active_engine:
+            return
+
+        if engine_or_model_id != "whisper" and engine_or_model_id not in _ENGINES:
+            print(f"Unknown speech engine '{engine_or_model_id}', ignoring.")
             return
 
         persisted_config = load_config()
-        persisted_config["asr_engine"] = engine_id
+        persisted_config["asr_engine"] = engine_or_model_id
         save_config(persisted_config)
 
-        self.main_window.dashboard_tab.set_active_engine_radio(engine_id)
-        self._switch_to(engine_id)
+        self.main_window.dashboard_tab.set_active_engine_radio(engine_or_model_id)
+        self._switch_to(engine_or_model_id)
 
     def set_whisper_model_size(self, new_model_size: str):
-        """Immediate model-size switch triggered from the Models & providers table's
-        Whisper row -- persists and reloads the live model right away, the same way
-        activate_asr_engine() does for engine switches, rather than waiting for
-        Dashboard's Save. No engine-status UI refresh needed: the combo the user
-        just changed already reflects the new value on its own.
-        """
+        """Switches Whisper model size, downloading first if needed."""
         rt = self.runtime
         if self.pipeline.is_busy():
             print("Still dictating -- try changing the model size again in a moment.")
             return
-        if new_model_size == rt.whisper_size:
+        if new_model_size == rt.whisper_size and rt.whisper is not None:
             return
 
-        persisted_config = load_config()
-        persisted_config["model_size"] = new_model_size
-        save_config(persisted_config)
+        model_id = f"whisper-{new_model_size}"
+        if not asr_catalog.is_downloaded(model_id):
+            print(f"Whisper {new_model_size} not downloaded. Starting download...")
+            self.start_model_download(model_id)
+            return
 
-        print(f"Loading {new_model_size} model...")
-        self.tray.set_status(f"Loading {new_model_size} model...")
-        rt.whisper = WhisperModel(new_model_size, device="cpu", compute_type="int8")
-        rt.whisper_size = new_model_size
-        self.tray.set_status("Ready")
-        print("Model updated.")
+        self._load_whisper_async(new_model_size)
 
     # ---- the Dashboard's Save --------------------------------------------------------
 
@@ -208,10 +284,6 @@ class SettingsController:
             print("Selected microphone is not usable, keeping the previous one.")
             new_device = rt.input_device
 
-        # Merge into the existing saved config rather than overwriting it outright --
-        # config.json also holds cleanup_providers/cleanup_models (managed by
-        # the Models & providers tab), which this dialog knows nothing about and
-        # must not wipe out.
         persisted_config = load_config()
         persisted_config.update(
             {
@@ -234,11 +306,7 @@ class SettingsController:
         self.pipeline.warm_active_ollama_model()
 
         if new_model_size != rt.whisper_size:
-            print(f"Loading {new_model_size} model...")
-            tray.set_status(f"Loading {new_model_size} model...")
-            rt.whisper = WhisperModel(new_model_size, device="cpu", compute_type="int8")
-            rt.whisper_size = new_model_size
-            print("Model updated.")
+            self.set_whisper_model_size(new_model_size)
 
         if new_device != rt.input_device:
             print("Switching microphone...")
@@ -254,7 +322,7 @@ class SettingsController:
             self._switch_to(new_asr_engine)
         else:
             tray.set_status("Ready")
-            self.main_window.refresh_engine_statuses(rt.active_engine, busy=self.pipeline.is_busy())
+            self.main_window.refresh_engine_statuses(rt.active_engine or "", busy=self.pipeline.is_busy())
 
     # ---- the Language and Models & providers tabs ------------------------------------
 

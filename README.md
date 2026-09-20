@@ -7,7 +7,7 @@
 <p align="center"><em>Hold a key, speak naturally, release — clean, AI-polished text lands at your cursor in a fraction of a second. 100% offline & private.</em></p>
 
 <p align="center">
-  <a href="https://github.com/amangit007/Infinisper/releases/tag/v1.0.0"><img src="https://img.shields.io/github/v/release/amangit007/Infinisper?color=0078d4&label=release" alt="latest release"></a>
+  <a href="https://github.com/amangit007/Infinisper/releases/tag/v1.1.0"><img src="https://img.shields.io/github/v/release/amangit007/Infinisper?color=0078d4&label=release" alt="latest release"></a>
   <a href="https://github.com/amangit007/Infinisper/actions/workflows/tests.yml"><img src="https://github.com/amangit007/Infinisper/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
@@ -16,12 +16,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/amangit007/Infinisper/releases/download/v1.0.0/Infinisper-v1.0.0-Setup.exe">
-    <img src="https://img.shields.io/badge/Download_for_Windows-v1.0.0_Setup.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
+  <a href="https://github.com/amangit007/Infinisper/releases/download/v1.1.0/Infinisper-v1.1.0-Setup.exe">
+    <img src="https://img.shields.io/badge/Download_for_Windows-v1.1.0_Setup.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
   </a>
   &nbsp;
-  <a href="https://github.com/amangit007/Infinisper/releases/download/v1.0.0/Infinisper-v1.0.0-Portable.zip">
-    <img src="https://img.shields.io/badge/Download_Portable-v1.0.0_Zip-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Download Portable">
+  <a href="https://github.com/amangit007/Infinisper/releases/download/v1.1.0/Infinisper-v1.1.0-Portable.zip">
+    <img src="https://img.shields.io/badge/Download_Portable-v1.1.0_Zip-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Download Portable">
   </a>
 </p>
 
@@ -55,10 +55,28 @@ Most voice dictation tools on Windows force you to compromise:
 | **Speech Recognition** | **100% Local (Runs on CPU)** | Remote cloud servers | Local or Cloud |
 | **Latency** | **~0.24s (Streaming ASR)** | ~1.0s (Network round-trip) | 2–8s (Batch waits for audio to end) |
 | **Hardware Needed** | **Standard Intel / AMD CPU** | Any (Cloud-based) | Often requires NVIDIA GPU |
+| **Model Configurability** | **8 local engines (Whisper Tiny→Large-v3, Nemotron, Qwen3)** | Closed / Fixed | Usually 1 fixed Whisper model |
+| **Storage Transparency** | **Interactive disk breakdown & 1-click delete** | N/A (Cloud hosted) | Unmanaged hidden cache folders |
 | **First-Word Truncation** | **None (500ms pre-roll buffer)** | Rare | Very common (mic start delay) |
 | **Clipboard Safety** | **Restores previous clipboard** | Direct hook / paste | Overwrites system clipboard |
 | **AI Formatting & Polish** | **Local via Ollama** (or Cloud) | Cloud AI | None (raw text only) |
 | **Audio Privacy** | **100% Local (RAM only)** | Sent to remote servers | 100% Local |
+
+---
+
+## Why Infinisper Stands Out from Other GitHub Alternatives
+
+If you explore open-source Wispr Flow alternatives on GitHub, most fall into one of two traps:
+1. **Barebones Whisper Wrappers:** They record audio to a file and run batch Whisper on key release, forcing you to wait 3–6 seconds after every sentence, frequently cutting off your first word, and dumping gigabytes of untracked model files in hidden cache folders.
+2. **Cloud-Tethered Clones:** They hook a hotkey but stream your live microphone audio to remote servers (OpenAI or Groq), requiring recurring API fees and sacrificing audio privacy.
+
+**Infinisper combines instant out-of-the-box speed with deep local configurability and storage sovereignty:**
+
+- **⚡ Real-Time Streaming on CPU:** Native FastConformer streaming (Nemotron 3.5) and Dynamic Catch-Up Batching (Qwen3-ASR) decode 50 ms audio slices *while you speak*, delivering instant ~0.24s transcription on standard CPUs without a discrete GPU.
+- **🎛️ Complete Model Sovereignty:** Choose from 6 discrete Whisper sizes (Tiny, Base, Small, Medium, Large v3 Turbo, Large v3) for batch accuracy, streaming Nemotron for speed, or Qwen3 for multilingual code-mixing. **Zero silent auto-downloads** — you download and activate only what you want.
+- **📊 Visual Storage Transparency:** Full control over your disk footprint with real-time byte/speed progress meters, an interactive storage breakdown doughnut chart, and 1-click model deletion.
+- **🛡️ 100% Private Hybrid AI Polish:** Clean up "um/uh", fix grammar, and format spoken lists locally using pre-warmed Ollama LLMs with thinking suppression, or optional free cloud fallbacks.
+- **🎙️ Studio Audio Engineering:** A 500 ms pre-roll ring buffer prevents first-syllable loss; an 80 Hz rumble notch filter rejects mic thumps; and non-destructive clipboard restoration preserves your previously copied code and passwords.
 
 ---
 
@@ -90,7 +108,7 @@ Measured on a standard laptop CPU (Ryzen 7, 8 cores). The speech engine runs **p
 
 ### Option A: Single-Click Windows Installer (Recommended)
 
-1. Download **[`Infinisper-v1.0.0-Setup.exe`](https://github.com/amangit007/Infinisper/releases/download/v1.0.0/Infinisper-v1.0.0-Setup.exe)** from the [Releases page](https://github.com/amangit007/Infinisper/releases/tag/v1.0.0).
+1. Download **[`Infinisper-v1.1.0-Setup.exe`](https://github.com/amangit007/Infinisper/releases/download/v1.1.0/Infinisper-v1.1.0-Setup.exe)** from the [Releases page](https://github.com/amangit007/Infinisper/releases/tag/v1.1.0).
 2. Run the installer and launch Infinisper.
 3. Put your cursor in any application, hold **`Ctrl + Win`**, speak, and release.
 
@@ -112,7 +130,7 @@ run.bat
 2. `run.bat` launches Infinisper into your system tray and opens the Dashboard.
 3. Put your cursor in any app, hold **`Ctrl + Win`**, speak, and release.
 
-Infinisper starts with Whisper out of the box (downloads a lightweight ~140 MB model on first launch). To enable real-time streaming, head to **Models & providers** in the app and click to download **Nemotron 3.5**.
+Infinisper keeps your initial download light and does not auto-download speech models in the background. On your first launch, an onboarding banner lets you download **Whisper Base (~145 MB)** with one click, or choose from real-time streaming **Nemotron 3.5**, **Qwen3-ASR**, or larger Whisper models (Small to Large-v3) in **Models & providers**.
 
 ---
 

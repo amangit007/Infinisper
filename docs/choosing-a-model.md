@@ -11,26 +11,32 @@ You can use just the first. Most people should start there.
 
 ## Speech engines
 
-All three run locally. Your audio never leaves your computer.
+All speech recognition runs 100% locally on your CPU. Your audio never leaves your computer. **No model is auto-downloaded on first launch** — you choose what to download and can delete models anytime to reclaim space.
 
-| | Download | Good for |
-|---|---|---|
-| **Whisper** (base / small) | Already there | Getting started with the least memory. No download step. |
-| **Nemotron 3.5 ASR** | ~650 MB | Fast everyday dictation for English and Hindi. Streams in real time while you talk (~0.2s latency). |
-| **Qwen3-ASR** | ~980 MB | Highest overall accuracy across multilingual dictation (French, German, Chinese, Japanese, and nuanced Hindi). |
+| Model | Download | Memory (RAM) | Good for |
+|---|---|---|---|
+| **Whisper Tiny** | ~75 MB | ~120 MB | Minimum resource usage, ultra-fast CPU decode. Lower accuracy on heavy accents. |
+| **Whisper Base** | ~145 MB | ~165 MB | **Recommended baseline.** Good everyday accuracy with lightweight RAM footprint. |
+| **Whisper Small** | ~460 MB | ~480 MB | Balanced upgrade for higher punctuation and capitalization fidelity across ~99 languages. |
+| **Whisper Medium** | ~1.5 GB | ~1.6 GB | High accuracy across diverse accents and specialized vocabulary. |
+| **Whisper Large v3 Turbo** | ~1.6 GB | ~2.5 GB | Near Large-v3 accuracy at 4x-6x faster decode speed via OpenAI's 4-layer decoder design. |
+| **Whisper Large v3** | ~3.1 GB | ~4.5 GB | Highest Whisper benchmark accuracy for tough audio, but heavy on CPU. |
+| **Nemotron 3.5 ASR** | ~650 MB | ~785 MB | **Recommended everyday driver.** Real-time streaming ASR (~0.2s latency) for English and Hindi. |
+| **Qwen3-ASR** | ~980 MB | ~1.1 GB | Multilingual champion with Dynamic Catch-Up Batching (European, East Asian, and code-mixed Hindi). |
 
-**If you're not sure:**
-- Start on **Whisper** to test out your microphone and hotkey immediately.
-- Move to **Nemotron** for your everyday driver: it's lightning fast, streams while you speak, and handles English and Hindi reliably.
-- Switch to **Qwen3-ASR** whenever transcription fidelity is your top priority: in daily use it delivers the highest accuracy across multilingual dictation (including European, East Asian, and complex or code-mixed Hindi speech). With Dynamic Catch-Up Batching, speech is segmented and decoded in the background while you speak, keeping response times under ~0.6–1.4s on standard CPUs.
+> **Important Note on Benchmark Measurements:**
+> Our published benchmark numbers (latency, memory, and speed tables in [benchmarks.md](benchmarks.md)) were conducted on the **Whisper Base** model as our standard lightweight baseline. We provide options for the larger Whisper models (Small, Medium, Large v3 Turbo, Large v3) because they can yield substantially higher transcription accuracy, but **we have not formally run benchmark tests on all of those larger variants**. Larger models require more RAM and will have longer CPU decode times unless accelerated.
 
-Downloads happen in **Models & providers**, with a progress bar, and only when you click.
-You can delete an engine from the same screen to get the disk space back.
+**If you're not sure where to start:**
+- Start with **Whisper Base (~145 MB)** to test your microphone and verify transcription right away.
+- Move to **Nemotron 3.5 (~650 MB)** as your everyday driver: it streams in real time as you speak, so by the time you release the hotkey, transcription is virtually instant (~0.24s).
+- Switch to **Qwen3-ASR (~980 MB)** or **Whisper Large v3 Turbo (~1.6 GB)** when transcription fidelity and handling nuanced terminology or accented speech is your highest priority.
+
+Downloads happen directly in **Models & providers** with real-time progress bars (speed and bytes). You can delete any engine at any time with one click to recover disk space. Hover over the disk badge (`on disk X MB 📊`) to see an interactive doughnut chart breakdown.
 
 ### Fallback
 
-If your chosen engine fails for any reason, Infinisper falls back to Whisper rather than
-losing what you said. You can turn that off in the Dashboard if you'd rather see the error.
+If your chosen engine fails for any reason, Infinisper falls back to an available downloaded Whisper model rather than losing what you said. You can toggle this in the Dashboard if you'd rather see the raw error.
 
 ---
 

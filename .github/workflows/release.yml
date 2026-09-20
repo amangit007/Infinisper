@@ -50,15 +50,17 @@ jobs:
 
       - name: Create Portable Zip
         run: |
-          Compress-Archive -Path "dist\Infinisper\*" -DestinationPath "dist-installer\Infinisper-v1.0.0-Portable.zip"
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag) { $tag = "v1.1.0" }
+          Compress-Archive -Path "dist\Infinisper\*" -DestinationPath "dist-installer\Infinisper-$tag-Portable.zip"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist-installer/Infinisper-v1.0.0-Setup.exe
-            dist-installer/Infinisper-v1.0.0-Portable.zip
-          name: Infinisper v1.0.0
+            dist-installer/*.exe
+            dist-installer/*.zip
+          name: Infinisper ${{ github.ref_name }}
           generate_release_notes: true
           draft: false
           prerelease: false

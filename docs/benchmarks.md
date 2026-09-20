@@ -14,7 +14,7 @@ python benchmarks/audio_pipeline.py    # audio cleanup chain
 
 - **Speech Recognition (ASR):** Runs **100% on the CPU only** across all tests (no GPU used).
 - **Optional Local AI Cleanup (Ollama):** Timed with Ollama utilizing an NVIDIA laptop GPU. On CPU-only systems, using a lightweight 0.5B–1.5B model takes ~0.4–0.8s, keeping overall latency well under a second.
-- **Whisper model:** Tested with Whisper `base`. Every engine runs using the application's default settings.
+- **Whisper baseline:** All Whisper benchmark measurements on this page were conducted specifically on the **Whisper Base** model (`whisper-base`) as our lightweight default baseline. Infinisper also provides options for **Whisper Tiny, Small, Medium, Large v3 Turbo, and Large v3**. While these larger models can yield significantly higher transcription fidelity on heavy accents and noisy audio, **we have not run formal benchmark scores on all of those larger models**. Expect larger models to require substantially more RAM and longer CPU decode times unless accelerated by a GPU.
 
 ---
 
@@ -23,7 +23,7 @@ python benchmarks/audio_pipeline.py    # audio cleanup chain
 Transcription time for continuous English speech, measured after the last word. Lower is
 better.
 
-| Speech length | Whisper | Nemotron (batch) | **Nemotron (streaming)** | Qwen3-ASR (batch) | **Qwen3-ASR (streaming)** |
+| Speech length | Whisper (Base) | Nemotron (batch) | **Nemotron (streaming)** | Qwen3-ASR (batch) | **Qwen3-ASR (streaming)** |
 |---|---|---|---|---|---|
 | 5 s | 0.85 s | 0.55 s | **0.10 s** | 1.27 s | **1.22 s** |
 | 10 s | 0.98 s | 0.98 s | **0.12 s** | 2.06 s | **0.64 s** |
@@ -45,9 +45,9 @@ that speed by being the least accurate, as the next section shows.
 
 | Engine | Memory for the model | Load time | Download |
 |---|---|---|---|
-| Whisper base | 164 MB | 1.5 s | ~140 MB, fetched on first launch |
-| Nemotron 3.5 | 784 MB | 3.3 s | ~650 MB |
-| Qwen3-ASR | 1,147 MB | 4.8 s | ~980 MB |
+| Whisper base | 164 MB | 1.5 s | ~145 MB, fetched on demand |
+| Nemotron 3.5 | 784 MB | 3.3 s | ~650 MB, fetched on demand |
+| Qwen3-ASR | 1,147 MB | 4.8 s | ~980 MB, fetched on demand |
 
 The memory column counts the model only, measured after warm-up with the runtimes already
 loaded. Load time is with the model files already in the disk cache; the first launch after a
@@ -139,13 +139,15 @@ This isn't a formal accuracy benchmark. It's five well-known sentences, one per 
 from the sample clips that come with the Nemotron download. Each engine's output was judged
 against the sentence actually spoken. Full transcripts are below the table.
 
-| Language | Whisper | Nemotron | Qwen3-ASR |
+| Language | Whisper (Base) | Nemotron | Qwen3-ASR |
 |---|---|---|---|
 | French | ✗ "pays" → "PIPE" | ✓ minor punctuation | ✓ **exact** |
 | German | ✓ exact | ✗ dropped first word | ✓ **exact** |
 | Chinese | ✓ in Traditional script | ✓ | ✓ **exact, with punctuation** |
 | Japanese | ✗ two wrong words | ✗ two wrong words | ✓ one small slip |
 | Spanish | ✗ second half garbled | ✗ partly garbled | ✗ partly garbled |
+
+*(Note: The Whisper column reflects the **Whisper Base** model. Larger variants such as Small, Medium, Large-v3 Turbo, or Large-v3 can provide significantly higher accuracy on complex accents and vocabulary, but have not been formally benchmarked in this comparison.)*
 
 Qwen3 was the best of the three on four of the five, so it's the one to try first for
 French, German, Chinese and Japanese. Hindi, measured properly below, went the other way.
@@ -172,8 +174,7 @@ transcription. To run it on your own voice, record clips with
 - **Nemotron and Qwen3 both scored strongly on Hindi** (1.9% vs 3.9% CER), with Nemotron about four times faster because it streams. In real-world daily dictation through the app's full audio pipeline, however, Qwen3-ASR's larger acoustic modeling delivers superior fidelity on natural conversational phrasing and code-mixed vocabulary, while Nemotron remains the top choice for near-instant streaming speed.
 - **Whisper `base` doesn't really do Hindi.** Across the six clips it never wrote a single
   Devanagari character. It returned an English translation, Roman letters, or Urdu script, so
-  the 95% is real, not a scoring quirk. Larger Whisper models are much better; `base` is the
-  one the app starts with.
+  the 95% is real, not a scoring quirk. Larger Whisper models (Medium, Large v3) are known to be much better on Hindi, though we have not formally benchmarked their error rates here.
 - **Cleanup helps, but only a little, and mostly by fixing spelling.** Gemini brought Qwen3
   from 3.9% to 1.7%. The local gemma4 e4b, through the app's real cleanup prompt, brought it
   from 3.9% to 3.5%, and it took 0.4 s per clip with thinking disabled. It fixed real
@@ -201,7 +202,7 @@ through Ollama; its ASR half ran slower (4 to 5 s per clip) because the app was 
 
 | | |
 |---|---|
-| Whisper | Ne vous demandez pas ce que votre PIPE peut faire pour vous. Demandez-vous plutôt ce que vous pouvez faire pour lui. |
+| Whisper (Base) | Ne vous demandez pas ce que votre PIPE peut faire pour vous. Demandez-vous plutôt ce que vous pouvez faire pour lui. |
 | Nemotron | Ne vous demandez pas ce que votre pays peut faire pour vous, demandez vous plutôt ce que vous pouvez faire pour lui |
 | Qwen3 | Ne vous demandez pas ce que votre pays peut faire pour vous, demandez-vous plutôt ce que vous pouvez faire pour lui. |
 
@@ -209,7 +210,7 @@ through Ollama; its ASR half ran slower (4 to 5 s per clip) because the app was 
 
 | | |
 |---|---|
-| Whisper | Alles hat ein Ende, nur die Wurst hat zwei. |
+| Whisper (Base) | Alles hat ein Ende, nur die Wurst hat zwei. |
 | Nemotron | hat ein Ende, nur die Wurst hat zwei |
 | Qwen3 | Alles hat ein Ende, nur die Wurst hat zwei. |
 
@@ -217,7 +218,7 @@ through Ollama; its ASR half ran slower (4 to 5 s per clip) because the app was 
 
 | | |
 |---|---|
-| Whisper | 不要問你的國家能為你做什麼,而要問你能為你的國家做什麼。 |
+| Whisper (Base) | 不要問你的國家能為你做什麼,而要問你能為你的國家做什麼。 |
 | Nemotron | 不要问你的国家能为你做什么, 而要问你能为你的国家做什么 |
 | Qwen3 | 不要问你的国家能为你做什么，而要问你能为你的国家做什么。 |
 
@@ -225,7 +226,7 @@ through Ollama; its ASR half ran slower (4 to 5 s per clip) because the app was 
 
 | | |
 |---|---|
-| Whisper | 国が花灯のために何ができるかを遠くではなくあなたが国のために何ができるかを遠くなさい |
+| Whisper (Base) | 国が花灯のために何ができるかを遠くではなくあなたが国のために何ができるかを遠くなさい |
 | Nemotron | 国が花とのために何ができるかを通のではなく、あなたが国のために何ができるかを通ってください |
 | Qwen3 | 国があなたのために何ができるかを問うのではなく、あなたが国のために何ができるかを問ってください。 |
 
@@ -233,7 +234,7 @@ through Ollama; its ASR half ran slower (4 to 5 s per clip) because the app was 
 
 | | |
 |---|---|
-| Whisper | No preguntes que puede hacer tu país por ti, te aguanta que puedes hacer que un por tu paz. |
+| Whisper (Base) | No preguntes que puede hacer tu país por ti, te aguanta que puedes hacer que un por tu paz. |
 | Nemotron | preguntas que puede hacer tu país porti. Pregunta qué puedes hacer que por tu país |
 | Qwen3 | Uno pregunta: ¿Qué puede hacer tu país por ti? Te pregunta: ¿Qué puedes hacer tu país por tu país? |
 

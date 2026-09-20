@@ -16,14 +16,15 @@ minutes the first time. After that, launch with `run.bat`.
 
 ## First run
 
-Infinisper opens a settings window and puts an icon in your system tray. It starts with
-Whisper. Its small model (about 140 MB) downloads by itself the first time you launch, so
-that first start needs internet. After that it works offline, and you can dictate straight away.
+Infinisper opens a settings window and places an icon in your system tray. **No speech model is auto-downloaded by default**, saving your bandwidth and storage until you decide.
 
-If you want faster or more accurate transcription, open **Models & providers** and
-download one of the other engines. Nothing downloads unless you click it. See
-[Choosing a model](choosing-a-model.md) for which one to pick, and the
-[performance guide](performance-guide.md) for tested setups.
+On your first launch:
+1. The app shows an onboarding banner welcoming you to download an ASR model.
+2. You can click **Download Whisper Base (~145 MB)** for a quick start, or navigate to **Models & providers** to select any model variant (from ultra-light Whisper Tiny to real-time streaming Nemotron or Whisper Large v3 Turbo).
+3. Live progress bars track percentage, bytes downloaded, and speed.
+4. Once downloaded, your chosen engine is ready to transcribe offline immediately.
+
+You can delete any downloaded model at any time from **Models & providers** to reclaim disk space, or hover over the disk usage badge (`on disk X MB 📊`) for an interactive storage breakdown. See [Choosing a model](choosing-a-model.md) for recommendations.
 
 ## Dictating
 

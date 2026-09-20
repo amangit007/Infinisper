@@ -235,6 +235,7 @@ class DashboardTab(QWidget):
     settings_saved = Signal(dict)
     delete_model_requested = Signal(str)  # engine_id
     manage_models_requested = Signal()
+    download_model_requested = Signal(str)  # model_id
 
     def __init__(self, current_config: dict, parent=None):
         super().__init__(parent)
@@ -413,6 +414,57 @@ class DashboardTab(QWidget):
         self.asr_toggle.toggled.connect(self._on_asr_toggled)
         header_layout.addWidget(self.asr_toggle)
         outer.addWidget(header)
+
+        self._onboarding_banner = QWidget()
+        self._onboarding_banner.setObjectName("OnboardingBanner")
+        ob_layout = QVBoxLayout(self._onboarding_banner)
+        ob_layout.setContentsMargins(14, 12, 14, 12)
+        ob_layout.setSpacing(8)
+
+        banner_msg = QLabel("⚠️ No speech recognition model installed. Download a model to enable offline dictation.")
+        banner_msg.setWordWrap(True)
+        banner_msg.setStyleSheet("font-weight: 600; font-size: 11px;")
+        ob_layout.addWidget(banner_msg)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        self._quick_dl_btn = QPushButton("Download Whisper Base (~145 MB)")
+        self._quick_dl_btn.setCursor(Qt.PointingHandCursor)
+        self._quick_dl_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(120, 140, 255, 0.25);
+                border: 1px solid rgba(120, 140, 255, 0.5);
+                border-radius: 5px;
+                padding: 4px 10px;
+                font-weight: 600;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background: rgba(120, 140, 255, 0.4);
+            }
+        """)
+        self._quick_dl_btn.clicked.connect(lambda: self.download_model_requested.emit("whisper-base"))
+        btn_row.addWidget(self._quick_dl_btn)
+
+        self._view_all_btn = QPushButton("View All Models →")
+        self._view_all_btn.setCursor(Qt.PointingHandCursor)
+        self._view_all_btn.setFlat(True)
+        self._view_all_btn.setStyleSheet("font-size: 11px; text-decoration: underline;")
+        self._view_all_btn.clicked.connect(self.manage_models_requested.emit)
+        btn_row.addWidget(self._view_all_btn)
+        btn_row.addStretch()
+        ob_layout.addLayout(btn_row)
+
+        self._onboarding_banner.setStyleSheet("""
+            QWidget#OnboardingBanner {
+                background: rgba(220, 150, 40, 0.14);
+                border: 1px solid rgba(220, 150, 40, 0.35);
+                border-radius: 8px;
+                margin: 8px 8px 0px 8px;
+            }
+        """)
+        outer.addWidget(self._onboarding_banner)
+        self._onboarding_banner.setVisible(not asr_catalog.has_any_model_downloaded())
 
         self._asr_body = QWidget()
         body_layout = QVBoxLayout(self._asr_body)
@@ -745,6 +797,8 @@ class DashboardTab(QWidget):
                 row.radio.blockSignals(True)
                 row.radio.setChecked(is_target)
                 row.radio.blockSignals(False)
+        if hasattr(self, "_onboarding_banner"):
+            self._onboarding_banner.setVisible(not asr_catalog.has_any_model_downloaded())
         self._update_pipeline_preview()
 
     def set_active_engine_radio(self, engine_id: str):

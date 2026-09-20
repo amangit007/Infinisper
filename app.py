@@ -99,11 +99,47 @@ def _window_config(settings: Settings, runtime: Runtime) -> dict:
 
 
 def _load_speech_models(runtime: Runtime, splash, step: int, total_steps: int):
-    """Loads Whisper (always) and the configured Qwen3 / Nemotron engine, if downloaded."""
+    """Loads speech models if already downloaded. Never auto-downloads silently on startup."""
     step += 1
-    splash.set_step(f"Loading speech model ({runtime.whisper_size})...", step, total_steps)
-    print(f"Loading speech model ({runtime.whisper_size})...")
-    runtime.whisper = WhisperModel(runtime.whisper_size, device="cpu", compute_type="int8")
+    from asr import catalog as asr_catalog
+
+    if not asr_catalog.has_any_model_downloaded():
+        splash.set_step("Ready -- download a model to begin", step, total_steps)
+        print("No speech models installed yet. Please download a model from the Models tab.")
+        runtime.whisper = None
+        runtime.active_engine = None
+        audio_vad.warm_up()
+        return
+
+    # Load configured whisper variant if downloaded
+    whisper_id = f"whisper-{runtime.whisper_size}"
+    if asr_catalog.is_downloaded(whisper_id):
+        model_path = asr_catalog.get_whisper_model_path(runtime.whisper_size)
+        splash.set_step(f"Loading speech model ({runtime.whisper_size})...", step, total_steps)
+        print(f"Loading speech model ({runtime.whisper_size}) from {model_path}...")
+        try:
+            runtime.whisper = WhisperModel(model_path, device="cpu", compute_type="int8")
+        except Exception as exc:
+            print(f"Failed to load Whisper ({exc}).")
+            runtime.whisper = None
+    else:
+        # Check if any other whisper size is downloaded
+        loaded_other = False
+        for size in asr_catalog.WHISPER_SIZES:
+            if asr_catalog.is_downloaded(f"whisper-{size}"):
+                model_path = asr_catalog.get_whisper_model_path(size)
+                splash.set_step(f"Loading speech model ({size})...", step, total_steps)
+                print(f"Loading fallback speech model ({size}) from {model_path}...")
+                try:
+                    runtime.whisper = WhisperModel(model_path, device="cpu", compute_type="int8")
+                    runtime.whisper_size = size
+                    loaded_other = True
+                    break
+                except Exception as exc:
+                    print(f"Failed to load Whisper {size} ({exc}).")
+        if not loaded_other:
+            runtime.whisper = None
+
     audio_vad.warm_up()
 
     if runtime.active_engine == "qwen3":
@@ -111,21 +147,44 @@ def _load_speech_models(runtime: Runtime, splash, step: int, total_steps: int):
         if qwen_asr.is_downloaded():
             splash.set_step("Loading Qwen3-ASR...", step, total_steps)
             print("Loading Qwen3-ASR...")
-            runtime.qwen3 = qwen_asr.Qwen3AsrEngine()
-            print("Qwen3-ASR loaded.")
+            try:
+                runtime.qwen3 = qwen_asr.Qwen3AsrEngine()
+                print("Qwen3-ASR loaded.")
+            except Exception as exc:
+                print(f"Failed to load Qwen3-ASR: {exc}")
+                runtime.active_engine = "whisper" if runtime.whisper else None
         else:
-            print("Qwen3-ASR selected but not downloaded -- open the Dashboard and Save to fetch it.")
-            runtime.active_engine = "whisper"
+            print("Qwen3-ASR not downloaded yet.")
+            runtime.active_engine = "whisper" if runtime.whisper else None
     elif runtime.active_engine == "nemotron":
         step += 1
         if nemotron_asr.is_downloaded():
             splash.set_step("Loading Nemotron 3.5 ASR...", step, total_steps)
             print("Loading Nemotron 3.5 ASR...")
-            runtime.nemotron = nemotron_asr.NemotronAsrEngine()
-            print("Nemotron 3.5 ASR loaded.")
+            try:
+                runtime.nemotron = nemotron_asr.NemotronAsrEngine()
+                print("Nemotron 3.5 ASR loaded.")
+            except Exception as exc:
+                print(f"Failed to load Nemotron 3.5 ASR: {exc}")
+                runtime.active_engine = "whisper" if runtime.whisper else None
         else:
-            print("Nemotron 3.5 ASR selected but not downloaded -- open the Dashboard and Save to fetch it.")
-            runtime.active_engine = "whisper"
+            print("Nemotron 3.5 ASR not downloaded yet.")
+            runtime.active_engine = "whisper" if runtime.whisper else None
+    elif runtime.whisper is None:
+        if qwen_asr.is_downloaded():
+            runtime.active_engine = "qwen3"
+            try:
+                runtime.qwen3 = qwen_asr.Qwen3AsrEngine()
+            except Exception:
+                pass
+        elif nemotron_asr.is_downloaded():
+            runtime.active_engine = "nemotron"
+            try:
+                runtime.nemotron = nemotron_asr.NemotronAsrEngine()
+            except Exception:
+                pass
+        else:
+            runtime.active_engine = None
 
 
 def main():
@@ -179,9 +238,13 @@ def main():
     main_window.dictation_language_changed.connect(controller.apply_dictation_language)
     main_window.custom_words_changed.connect(controller.apply_custom_words)
     main_window.delete_model_requested.connect(controller.delete_model)
+    main_window.download_model_requested.connect(controller.start_model_download)
     main_window.activate_engine_requested.connect(controller.activate_asr_engine)
     main_window.whisper_model_size_changed.connect(controller.set_whisper_model_size)
     main_window.cleanup_changed.connect(controller.on_cleanup_changed)
+
+    from asr.downloader import get_downloader
+    get_downloader().download_finished.connect(controller.on_download_finished)
 
     audio_capture.set_chip(_LevelFanout(chip, main_window.sidebar))
     chip.state_changed.connect(

@@ -115,6 +115,9 @@ class Pipeline:
 
     def run_whisper(self, audio: np.ndarray, steps: list | None = None) -> str:
         rt, settings = self.runtime, self.settings
+        if rt.whisper is None:
+            print("No speech recognition model loaded. Please download a model from Models & providers.")
+            return ""
         with timed(f"Whisper transcribe ({rt.whisper_size})", steps):
             # vad_filter is off because audio.vad already trimmed this take with the same
             # Silero parameters this call used to pass -- every engine now gets trimmed
@@ -146,6 +149,8 @@ class Pipeline:
             engine, label = rt.nemotron, "Nemotron"
 
         if engine is None:
+            if rt.whisper is None:
+                return AsrOutcome("", "", error="No speech model downloaded. Please download a model.")
             return AsrOutcome(self.run_whisper(audio, steps), "Whisper")
 
         try:

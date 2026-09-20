@@ -30,8 +30,8 @@ All three engines run **100% locally on your CPU**. No discrete GPU or CUDA inst
 - **Practical accuracy:** While Nemotron measures slightly ahead on strictly read, scripted sample clips, Qwen3's larger acoustic modeling excels in everyday dictation on natural phrasing, accents, and multilingual mixing.
 - **Streaming with Dynamic Catch-Up Batching:** Speech segments are dispatched to background decoding at natural breath pauses while you speak. If backlog accumulates, waiting chunks are decoded together via native ONNX batching. Post-speech wait time drops to **~0.6–1.4 s** (down from ~3–8 s).
 
-### 3. Whisper (Quick Start)
-- Bundled default that downloads a small model (~140 MB) on first launch. Low memory, reliable for basic dictation. Most daily users will prefer upgrading to Nemotron (for speed) or Qwen3 (for multilingual accuracy) via **Models & providers**.
+### 3. Whisper (Lightweight Baseline)
+- Available as an on-demand download starting with **Whisper Base (~145 MB)**. Low memory, reliable for basic dictation. Infinisper also offers **Whisper Tiny, Small, Medium, Large v3 Turbo, and Large v3** for users who need higher accuracy. Most daily users will prefer upgrading to Nemotron (for real-time streaming speed) or Qwen3 (for multilingual accuracy) via **Models & providers**.
 
 ### Real-world latency on CPU
 

@@ -1,8 +1,8 @@
 ; Inno Setup Script for Infinisper
-; Creates a standalone Windows Installer: Infinisper-v1.0.0-Setup.exe
+; Creates a standalone Windows Installer: Infinisper-v1.1.0-Setup.exe
 
 #define MyAppName "Infinisper"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Infinisper Open Source"
 #define MyAppURL "https://github.com/amangit007/infinisper"
 #define MyAppExeName "Infinisper.exe"
@@ -20,7 +20,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE
 OutputDir=dist-installer
-OutputBaseFilename=Infinisper-v1.0.0-Setup
+OutputBaseFilename=Infinisper-v1.1.0-Setup
 SetupIconFile=assets\infinisper.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

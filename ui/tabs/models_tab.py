@@ -1,5 +1,4 @@
-
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -14,28 +13,53 @@ from PySide6.QtWidgets import (
 )
 
 from asr import catalog as asr_catalog
+from asr.downloader import downloader, format_bytes
 from config import load_config, save_config
 from credentials import delete_api_key
+from ui.dialogs.model_dialog import ModelDialog
+from ui.dialogs.provider_dialog import ProviderDialog
 from ui.widgets.asr_engine_card import EngineTableRow
+from ui.widgets.disk_pie_chart import DiskPieChartPopover
 from ui.widgets.model_card import ModelCard
 from ui.widgets.provider_card import ProviderCard
 
-from ui.dialogs.model_dialog import ModelDialog
-from ui.dialogs.provider_dialog import ProviderDialog
+
+class HoverableDiskLabel(QLabel):
+    """Badge that presents an interactive storage breakdown doughnut chart on hover."""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.PointingHandCursor)
+        self._popover = None
+
+    def enterEvent(self, event):
+        if self._popover:
+            self._popover.close()
+            self._popover.deleteLater()
+        self._popover = DiskPieChartPopover(self.window())
+        self._popover.show_below(self)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if self._popover:
+            self._popover.hide()
+        super().leaveEvent(event)
 
 
 class EnginesSubTab(QWidget):
-    """Sub-tab for viewing and managing on-device speech recognition engines."""
+    """Sub-tab for viewing and managing on-device speech recognition models."""
 
-    activate_requested = Signal(str)  # engine_id
-    delete_requested = Signal(str)  # engine_id
-    model_size_changed = Signal(str)  # whisper only
+    activate_requested = Signal(str)  # model_id
+    download_requested = Signal(str)  # model_id
+    delete_requested = Signal(str)  # model_id
+    cancel_requested = Signal(str)  # model_id
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._active_engine = "whisper"
         self._busy = False
         self._model_size = load_config().get("model_size", "base")
+        self._rows: dict[str, EngineTableRow] = {}
         self.setObjectName("Card")
         self.setAttribute(Qt.WA_StyledBackground, True)
 
@@ -48,11 +72,11 @@ class EnginesSubTab(QWidget):
         header.setAttribute(Qt.WA_StyledBackground, True)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(18, 13, 18, 13)
-        title = QLabel("Installed models")
+        title = QLabel("Speech Recognition Models")
         title.setObjectName("TableCardHeaderTitle")
         header_layout.addWidget(title)
         header_layout.addStretch()
-        one_active_note = QLabel("One active at a time")
+        one_active_note = QLabel("One active at a time • Hover disk badge for breakdown")
         one_active_note.setObjectName("TableCardHeaderNote")
         header_layout.addWidget(one_active_note)
         outer.addWidget(header)
@@ -65,11 +89,12 @@ class EnginesSubTab(QWidget):
         model_col = QLabel("MODEL")
         model_col.setObjectName("ColumnHeaderLabel")
         columns_layout.addWidget(model_col, 1)
-        for text, width in (("SIZE", 114), ("LANGUAGES", 104), ("STATUS", 194)):
+
+        for text, width in (("SIZE", 100), ("LANGUAGES", 110), ("STATUS & ACTIONS", 260)):
             col_label = QLabel(text)
             col_label.setObjectName("ColumnHeaderLabel")
             col_label.setFixedWidth(width)
-            if text == "STATUS":
+            if "STATUS" in text:
                 col_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             columns_layout.addWidget(col_label)
         outer.addWidget(columns)
@@ -84,63 +109,80 @@ class EnginesSubTab(QWidget):
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(18, 11, 18, 11)
         footer_note = QLabel(
-            "Deleting the active model switches back to Whisper."
+            "Download any model to activate. You can delete downloaded models at any time to reclaim space."
         )
         footer_note.setObjectName("TableCardFooterNote")
         footer_layout.addWidget(footer_note)
         footer_layout.addStretch()
-        self.disk_label = QLabel()
+        self.disk_label = HoverableDiskLabel()
         self.disk_label.setObjectName("DiskUsageLabel")
         footer_layout.addWidget(self.disk_label)
         outer.addWidget(footer)
+
+        downloader.progress_updated.connect(self._on_download_progress)
+        downloader.download_finished.connect(self._on_download_finished)
 
         self.refresh(self._active_engine, self._busy)
 
     def refresh(self, active_engine: str, busy: bool):
         self._active_engine = active_engine
         self._busy = busy
+        self._rows.clear()
+
         while self.list_container.count():
             item = self.list_container.takeAt(0)
             widget = item.widget()
             if widget:
-                # setParent(None) detaches (and hides) it immediately;
-                # deleteLater() alone leaves it as a visible, un-laid-out
-                # child until the event loop's next turn, which paints as
-                # stale rows overlapping the freshly built ones whenever
-                # refresh() is called twice back-to-back.
                 widget.setParent(None)
                 widget.deleteLater()
 
-        for engine_id in asr_catalog.ENGINE_ORDER:
-            meta = asr_catalog.ENGINES[engine_id]
+        current_config = load_config()
+        configured_whisper_size = current_config.get("model_size", "base")
+
+        for model_id in asr_catalog.MODEL_ORDER:
+            meta = asr_catalog.MODELS[model_id]
+            is_active = False
+            if active_engine == "whisper":
+                is_active = (model_id == f"whisper-{configured_whisper_size}")
+            else:
+                is_active = (model_id == active_engine)
+
+            downloaded = asr_catalog.is_downloaded(model_id)
+
             row = EngineTableRow(
-                engine_id,
+                model_id,
                 meta,
-                is_active=(engine_id == active_engine),
-                downloaded=asr_catalog.is_downloaded(engine_id),
+                is_active=is_active,
+                downloaded=downloaded,
                 busy=busy,
-                current_model_size=self._model_size,
             )
             row.activate_requested.connect(self.activate_requested.emit)
+            row.download_requested.connect(self.download_requested.emit)
             row.delete_requested.connect(self.delete_requested.emit)
-            row.model_size_changed.connect(self._on_model_size_changed)
+            row.cancel_requested.connect(self.cancel_requested.emit)
+
+            self._rows[model_id] = row
             self.list_container.addWidget(row)
 
-        self.disk_label.setText(f"{asr_catalog.disk_usage_bytes() / (1024 ** 3):.2f} GB on disk")
+        self.disk_label.setText(f"{format_bytes(asr_catalog.disk_usage_bytes())} on disk 📊")
 
-    def _on_model_size_changed(self, size: str):
-        self._model_size = size
-        self.model_size_changed.emit(size)
+    def _on_download_progress(self, model_id, dl_b, total_b, pct, speed_str, status_str):
+        if model_id in self._rows:
+            self._rows[model_id].update_progress(pct, speed_str, status_str)
 
-    def confirm_and_request_delete(self, engine_id: str, is_active: bool) -> bool:
-        meta = asr_catalog.ENGINES[engine_id]
-        directory = asr_catalog.model_dir(engine_id)
+    def _on_download_finished(self, model_id, success, err_msg):
+        self.refresh(self._active_engine, self._busy)
+
+    def confirm_and_request_delete(self, model_id: str, is_active: bool) -> bool:
+        meta = asr_catalog.get_model_info(model_id)
+        directory = asr_catalog.model_dir(model_id)
+        size_label = meta.get("size_label", "")
         message = (
-            f"Delete {meta['label']} ({meta['size_label']} from {directory})?\n\n"
-            "This permanently deletes the downloaded files, bypassing the Recycle Bin."
+            f"Delete {meta['label']} ({size_label} from {directory})?\n\n"
+            "This will permanently delete the downloaded model weights to reclaim disk space."
         )
         if is_active:
-            message += "\n\nThis is your active engine -- Infinisper will switch to Whisper."
+            message += "\n\nThis is currently your active speech model -- Infinisper will switch to another available model."
         reply = QMessageBox.question(
             self,
             "Delete model",
@@ -203,11 +245,6 @@ class ProvidersSubTab(QWidget):
             item = self.list_container.takeAt(0)
             widget = item.widget()
             if widget:
-                # setParent(None) detaches (and hides) it immediately;
-                # deleteLater() alone leaves it as a visible, un-laid-out
-                # child until the event loop's next turn, which paints as
-                # stale rows overlapping the freshly built ones whenever
-                # refresh() is called twice back-to-back.
                 widget.setParent(None)
                 widget.deleteLater()
 
@@ -228,25 +265,11 @@ class ProvidersSubTab(QWidget):
         if existing is None:
             return
         dialog = ProviderDialog(existing=existing, parent=self)
-        if dialog.exec() != QDialog.Accepted:
-            return
-        if dialog.result_delete:
-            self._confirm_and_delete(provider_id)
-        else:
-            self._models_tab.save_provider(dialog.result_provider)
-
-    def _confirm_and_delete(self, provider_id: str):
-        used_by = [
-            m["display_name"] for m in self._models_tab.models() if m["provider_id"] == provider_id
-        ]
-        message = "Delete this provider and its stored API key?"
-        if used_by:
-            message += "\n\nThis also removes the model(s) that depend on it: " + ", ".join(used_by)
-        reply = QMessageBox.question(
-            self, "Delete provider", message, QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            self._models_tab.delete_provider(provider_id)
+        if dialog.exec() == QDialog.Accepted:
+            if dialog.deleted:
+                self._models_tab.delete_provider(provider_id)
+            else:
+                self._models_tab.save_provider(dialog.result_provider)
 
 
 class ModelsSubTab(QWidget):
@@ -302,11 +325,6 @@ class ModelsSubTab(QWidget):
             item = self.list_container.takeAt(0)
             widget = item.widget()
             if widget:
-                # setParent(None) detaches (and hides) it immediately;
-                # deleteLater() alone leaves it as a visible, un-laid-out
-                # child until the event loop's next turn, which paints as
-                # stale rows overlapping the freshly built ones whenever
-                # refresh() is called twice back-to-back.
                 widget.setParent(None)
                 widget.deleteLater()
 
@@ -347,11 +365,8 @@ class ModelsSubTab(QWidget):
 
     def _on_delete(self, model_id: str):
         reply = QMessageBox.question(
-            self,
-            "Delete model",
-            "Remove this model?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            self, "Delete model", "Remove this model from your configuration?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if reply == QMessageBox.Yes:
             self._models_tab.delete_model(model_id)
@@ -363,9 +378,11 @@ class ModelsSubTab(QWidget):
 class ModelsTab(QWidget):
     """Models & providers tab for configuring speech recognition engines and AI models."""
 
-    changed = Signal()  # providers/models/active-model changed -- app.py refreshes its runtime cache
-    activate_engine_requested = Signal(str)  # engine_id
-    delete_engine_requested = Signal(str)  # engine_id
+    changed = Signal()  # providers/models/active-model changed
+    activate_engine_requested = Signal(str)  # model_id
+    download_requested = Signal(str)  # model_id
+    delete_engine_requested = Signal(str)  # model_id
+    cancel_download_requested = Signal(str)  # model_id
     whisper_model_size_changed = Signal(str)
 
     def __init__(self, parent=None):
@@ -375,8 +392,9 @@ class ModelsTab(QWidget):
 
         self.engines_subtab = EnginesSubTab(self)
         self.engines_subtab.activate_requested.connect(self.activate_engine_requested.emit)
+        self.engines_subtab.download_requested.connect(self.download_requested.emit)
         self.engines_subtab.delete_requested.connect(self.delete_engine_requested.emit)
-        self.engines_subtab.model_size_changed.connect(self.whisper_model_size_changed.emit)
+        self.engines_subtab.cancel_requested.connect(self.cancel_download_requested.emit)
 
         self.providers_subtab = ProvidersSubTab(self)
         self.models_subtab = ModelsSubTab(self)
@@ -400,7 +418,7 @@ class ModelsTab(QWidget):
         hint.setObjectName("PageHint")
         header_layout.addWidget(hint)
         header_layout.addStretch()
-        self.disk_total_label = QLabel()
+        self.disk_total_label = HoverableDiskLabel()
         self.disk_total_label.setObjectName("DiskUsageLabel")
         header_layout.addWidget(self.disk_total_label)
         outer.addWidget(header)
@@ -423,7 +441,7 @@ class ModelsTab(QWidget):
         section1.addLayout(
             self._section_heading(
                 "1  Speech recognition",
-                "Nothing downloads until you ask.",
+                "Hover disk badge on right for full storage breakdown.",
             )
         )
         section1.addWidget(self.engines_subtab)
@@ -466,10 +484,10 @@ class ModelsTab(QWidget):
         self._refresh_disk_total()
 
     def _refresh_disk_total(self):
-        self.disk_total_label.setText(f"on disk {asr_catalog.disk_usage_bytes() / (1024 ** 3):.2f} GB")
+        self.disk_total_label.setText(f"on disk {format_bytes(asr_catalog.disk_usage_bytes())} 📊")
 
-    def confirm_and_request_delete_engine(self, engine_id: str, is_active: bool) -> bool:
-        return self.engines_subtab.confirm_and_request_delete(engine_id, is_active)
+    def confirm_and_request_delete_engine(self, model_id: str, is_active: bool) -> bool:
+        return self.engines_subtab.confirm_and_request_delete(model_id, is_active)
 
     def providers(self) -> list[dict]:
         return load_config()["cleanup_providers"]
