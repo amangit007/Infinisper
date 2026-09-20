@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+import tiktoken_ext.openai_public  # noqa: F401 - required for tiktoken cl100k_base registry in frozen apps
 import litellm
 import numpy as np
 from dotenv import load_dotenv

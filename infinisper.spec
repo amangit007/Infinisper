@@ -9,6 +9,8 @@ datas = [
 ]
 datas += collect_data_files('sherpa_onnx')
 datas += collect_data_files('litellm')
+datas += collect_data_files('tiktoken')
+datas += collect_data_files('tiktoken_ext')
 
 binaries = []
 binaries += collect_dynamic_libs('sherpa_onnx')
@@ -30,6 +32,9 @@ hiddenimports = [
     'ctranslate2',
     'faster_whisper',
     'litellm',
+    'tiktoken',
+    'tiktoken_ext',
+    'tiktoken_ext.openai_public',
 ]
 hiddenimports += collect_submodules('keyring')
 hiddenimports += collect_submodules('dictation')
@@ -39,6 +44,8 @@ hiddenimports += collect_submodules('cleanup')
 hiddenimports += collect_submodules('history')
 hiddenimports += collect_submodules('ui')
 hiddenimports += collect_submodules('utils')
+hiddenimports += collect_submodules('tiktoken')
+hiddenimports += collect_submodules('tiktoken_ext')
 
 a = Analysis(
     ['main.py'],
