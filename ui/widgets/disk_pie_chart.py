@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsDropShadowEffect,
